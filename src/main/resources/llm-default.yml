@@ -1,0 +1,17 @@
+provider:
+  type: openai
+  model: gpt-3.5-turbo
+
+execution:
+  timeoutMillis: 60000
+  maxRetries: 3
+  retryDelayMillis: 1000
+
+features:
+  toolCalling: true
+  streaming: true
+
+security:
+  contentFilter: false
+  dataMasking: false
+  auditLog: false
