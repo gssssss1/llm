@@ -1,19 +1,33 @@
 # Session-Based LLM Framework
 
-A simple, efficient, and elegant Java framework for interacting with Large Language Models (LLMs) through a session-centric architecture.
+A production-ready, enterprise-grade Java framework for interacting with Large Language Models (LLMs) through a session-centric architecture.
 
 ## Features
 
-- **Session-Centric Design**: Conversations are managed through intuitive sessions with state management
+### Core Features
+- **Session-Centric Design**: Conversations managed through intuitive sessions with state management
 - **Multi-Provider Support**: Built-in adapters for OpenAI and Anthropic with easy extensibility
 - **Flexible Execution Modes**: Synchronous, asynchronous, streaming, and batch processing
-- **Message History Management**: Multiple strategies (FULL, SLIDING_WINDOW, TOKEN_LIMIT, SUMMARY)
-- **Tool Calling System**: Register and execute custom tools/functions
-- **Interceptor Chain**: Extensible middleware for logging, metrics, caching, auth, etc.
+- **Message History Management**: Multiple strategies (FULL, SLIDING_WINDOW, TOKEN_LIMIT)
+- **Tool Calling System**: Register and execute custom tools/functions with timeout and validation
 - **Session Persistence**: Save and restore conversation state
-- **Session Pooling**: Reuse sessions efficiently
-- **Cost Tracking**: Monitor token usage and API costs
 - **Type-Safe API**: Leverages Java's type system for compile-time safety
+
+### Advanced Features
+- **Comprehensive Interceptor System**:
+  - 🔁 **Retry with Exponential Backoff**: Intelligent retry with jitter
+  - 💾 **Smart Caching**: Content-based caching with TTL and LRU eviction
+  - 🚦 **Rate Limiting**: Sliding window rate limiter
+  - 🔌 **Circuit Breaker**: Prevent cascading failures
+  - 🔒 **Content Filtering**: Filter inappropriate content
+  - 🔑 **Authentication**: API key validation
+  - 📝 **Logging & Metrics**: Comprehensive observability
+
+- **Session Pooling**: Advanced session management with health checks and automatic cleanup
+- **Monitoring & Metrics**: Detailed performance metrics, latency tracking, and token usage
+- **Security**: Content filtering, data masking, audit logging
+- **Prompt Templates**: Reusable prompt templates with variable substitution
+- **Cost Tracking**: Monitor token usage and API costs per provider
 
 ## Quick Start
 
@@ -316,9 +330,16 @@ See the `examples/` directory for complete examples:
 - `StreamingExample`: Streaming responses
 - `AsyncExample`: Asynchronous requests
 - `ToolCallingExample`: Function calling
+- `ToolExecutionExample`: Advanced tool execution with timeouts and batch processing
 - `PersistenceExample`: Save/restore sessions
-- `InterceptorExample`: Custom middleware
+- `InterceptorExample` & `AdvancedInterceptorExample`: Middleware and observability
+- `SessionPoolExample`: Session pooling and lifecycle management
+- `MonitoringExample`: Metrics collection and reporting
+- `ProductionReadyExample`: Full production-grade setup
+- `ConfigFileExample`: Configuration via YAML
 - `BatchProcessingExample`: Batch requests
+
+For a deep dive into advanced features, see [ADVANCED_FEATURES.md](ADVANCED_FEATURES.md).
 
 ## Architecture
 

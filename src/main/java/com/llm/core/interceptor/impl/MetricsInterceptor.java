@@ -19,13 +19,26 @@ public class MetricsInterceptor implements Interceptor {
 
     @Override
     public Response intercept(Request request, Chain chain, ProviderAdapter adapter) {
-        metrics.increment("requests.total");
         String provider = adapter.getType().getId();
-        metrics.increment("requests." + provider);
+        metrics.increment("requests.total");
+        metrics.increment("requests.provider." + provider);
+
         long start = System.nanoTime();
-        Response response = chain.proceed(request);
-        long duration = System.nanoTime() - start;
-        metrics.incrementBy("latency." + provider, duration);
-        return response;
+        try {
+            Response response = chain.proceed(request);
+            long duration = System.nanoTime() - start;
+            metrics.recordLatency(provider, duration);
+            if (response.getUsage() != null) {
+                metrics.recordTokens(provider, response.getUsage());
+            }
+            metrics.increment("requests.success");
+            return response;
+        } catch (Exception ex) {
+            metrics.increment("requests.failure");
+            metrics.increment("requests.failure." + provider);
+            throw ex;
+        } finally {
+            metrics.logRequest(provider, System.nanoTime() - start);
+        }
     }
 }

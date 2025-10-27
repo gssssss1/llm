@@ -2,6 +2,8 @@ package com.llm.core.session;
 
 import com.llm.config.ModelConfig;
 import com.llm.core.interceptor.InterceptorChain;
+import com.llm.core.interceptor.impl.*;
+import com.llm.monitoring.Metrics;
 import com.llm.persistence.FileStore;
 import com.llm.persistence.SessionPersistence;
 import com.llm.persistence.SessionSnapshot;
@@ -9,6 +11,7 @@ import com.llm.provider.ProviderAdapter;
 import com.llm.provider.ProviderType;
 import com.llm.provider.anthropic.AnthropicAdapter;
 import com.llm.provider.openai.OpenAIAdapter;
+import com.llm.security.BasicContentFilter;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -20,10 +23,25 @@ public class SessionFactory {
 
     private final Map<ProviderType, ProviderAdapter> providerRegistry = new HashMap<>();
     private final SessionPersistence defaultPersistence;
+    private final Metrics globalMetrics;
 
     public SessionFactory() {
         this.defaultPersistence = new FileStore();
+        this.globalMetrics = new Metrics();
         registerDefaultProviders();
+    }
+
+    public Metrics getGlobalMetrics() {
+        return globalMetrics;
+    }
+
+    public InterceptorChain buildDefaultInterceptorChain() {
+        return InterceptorChain.builder()
+                .addInterceptor(new LoggingInterceptor())
+                .addInterceptor(new MetricsInterceptor(globalMetrics))
+                .addInterceptor(new RetryInterceptor())
+                .addInterceptor(new ErrorHandlerInterceptor())
+                .build();
     }
 
     private void registerDefaultProviders() {
@@ -113,7 +131,7 @@ public class SessionFactory {
             throw new IllegalStateException("No adapter registered for provider: " + providerType);
         }
 
-        InterceptorChain chain = InterceptorChain.builder().build();
+        InterceptorChain chain = buildDefaultInterceptorChain();
 
         return new DefaultLLMSession(null, config, context, adapter, chain, defaultPersistence);
     }
