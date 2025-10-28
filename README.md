@@ -19,6 +19,9 @@
 ### 5. LLM 客户端 ⭐ NEW
 基于 OkHttp 的 HTTP 客户端，支持 OpenAI 和 Anthropic API 调用。
 
+### 6. Session 与事件驱动 ⭐ NEW
+基于事件的会话管理，支持记忆和上下文管理。
+
 ## 功能特性
 
 ### JSON Schema Generator
@@ -65,6 +68,16 @@
 - ✅ 自动格式转换
 - ✅ 完整的错误处理
 - ✅ 可配置超时和重试
+
+### Session 与事件驱动 ⭐ NEW
+- ✅ 事件驱动架构
+- ✅ UserMessage, AssistantMessage, ToolCall, ToolResult 事件
+- ✅ 事件监听和处理
+- ✅ 短期/长期记忆系统
+- ✅ 上下文管理（查询、压缩、删除）
+- ✅ Token 计数和限制
+- ✅ 会话管理（SessionManager）
+- ✅ 多用户支持
 
 ## 快速开始
 
@@ -380,6 +393,79 @@ try {
 ```
 
 **详细文档**: 查看 [LLM_CLIENT_README.md](LLM_CLIENT_README.md)
+
+### 快速开始 - Session 会话管理 ⭐
+
+```java
+// 1. 创建会话
+OpenAIClient client = OpenAIClient.builder()
+    .apiKey("your-api-key")
+    .build();
+
+ToolExecutor toolExecutor = new ToolExecutor();
+toolExecutor.registerTool(new MyTools());
+
+Session session = Session.builder()
+    .userId("user_123")
+    .client(client)
+    .model("gpt-3.5-turbo")
+    .toolExecutor(toolExecutor)
+    .systemPrompt("You are a helpful assistant.")
+    .build();
+
+// 2. 添加事件监听
+session.addEventListener(new EventHandler() {
+    @Override
+    public void onEvent(Event event) {
+        System.out.println("Event: " + event.getType());
+    }
+    
+    @Override
+    public void onAssistantMessage(AssistantMessageEvent event) {
+        System.out.println("Tokens: " + event.getTokensUsed());
+    }
+});
+
+// 3. 发送消息
+String response = session.sendMessage("Hello!");
+
+// 4. 上下文管理
+ContextManager contextManager = session.getContextManager();
+List<Message> userMessages = contextManager.query(
+    MessageFilter.byRole(MessageRole.USER)
+);
+contextManager.compress(); // 压缩上下文
+```
+
+**完整示例：**
+
+```java
+SessionManager sessionManager = new SessionManager();
+
+Session session = sessionManager.createSession(
+    Session.builder()
+        .userId("user_123")
+        .client(client)
+        .model("gpt-3.5-turbo")
+        .toolExecutor(toolExecutor)
+);
+
+// 多轮对话
+session.sendMessage("What's the weather?");
+session.sendMessage("And the time?");
+
+// 查看统计
+System.out.println("Events: " + session.getEvents().size());
+System.out.println("Messages: " + session.getConversation().size());
+System.out.println("Tokens: " + session.getContextManager().getTotalTokens());
+
+// 记忆管理
+Memory memory = session.getMemory();
+memory.add("user_preference", "dark_mode");
+String pref = memory.get("user_preference");
+```
+
+**详细文档**: 查看 [SESSION_AND_CONTEXT_README.md](SESSION_AND_CONTEXT_README.md)
 
 ## 注解说明
 
