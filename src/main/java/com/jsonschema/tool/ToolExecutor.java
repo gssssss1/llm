@@ -4,6 +4,8 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.jsonschema.annotations.Tool;
 import com.jsonschema.generator.JsonSchemaGenerator;
+import com.jsonschema.tool.interceptor.ToolInterceptor;
+import com.jsonschema.tool.interceptor.ToolInvocation;
 
 import java.lang.reflect.Method;
 import java.util.*;
@@ -13,6 +15,7 @@ public class ToolExecutor {
     private final Map<String, ToolDefinition> tools = new LinkedHashMap<>();
     private final JsonSchemaGenerator schemaGenerator = new JsonSchemaGenerator();
     private final Gson gson = new Gson();
+    private final List<ToolInterceptor> globalInterceptors = new ArrayList<>();
     
     public void registerTool(Object toolProvider) {
         Class<?> clazz = toolProvider.getClass();
@@ -54,6 +57,16 @@ public class ToolExecutor {
                     schema
                 );
                 
+                Class<? extends ToolInterceptor>[] interceptorClasses = toolAnnotation.interceptors();
+                for (Class<? extends ToolInterceptor> interceptorClass : interceptorClasses) {
+                    try {
+                        ToolInterceptor interceptor = interceptorClass.getDeclaredConstructor().newInstance();
+                        toolDef.addInterceptor(interceptor);
+                    } catch (Exception e) {
+                        throw new RuntimeException("Failed to instantiate interceptor: " + interceptorClass.getName(), e);
+                    }
+                }
+                
                 tools.put(toolName, toolDef);
             }
         }
@@ -76,14 +89,47 @@ public class ToolExecutor {
         
         method.setAccessible(true);
         
+        Object[] args;
         if (method.getParameterCount() == 0) {
-            return method.invoke(instance);
+            args = new Object[0];
+        } else {
+            Class<?> paramClass = tool.getParameterClass();
+            Object parameter = gson.fromJson(jsonParameters, paramClass);
+            args = new Object[]{parameter};
         }
         
-        Class<?> paramClass = tool.getParameterClass();
-        Object parameter = gson.fromJson(jsonParameters, paramClass);
+        return executeWithInterceptors(toolName, method, instance, args, tool);
+    }
+    
+    private Object executeWithInterceptors(String toolName, Method method, Object instance, 
+                                          Object[] args, ToolDefinition tool) throws Exception {
+        ToolInvocation invocation = new ToolInvocation(toolName, method, instance, args);
         
-        return method.invoke(instance, parameter);
+        List<ToolInterceptor> allInterceptors = new ArrayList<>();
+        allInterceptors.addAll(globalInterceptors);
+        allInterceptors.addAll(tool.getInterceptors());
+        
+        try {
+            for (ToolInterceptor interceptor : allInterceptors) {
+                interceptor.before(invocation);
+            }
+            
+            Object result = method.invoke(instance, args);
+            
+            for (int i = allInterceptors.size() - 1; i >= 0; i--) {
+                allInterceptors.get(i).after(invocation, result);
+            }
+            
+            return result;
+        } catch (Exception e) {
+            for (int i = allInterceptors.size() - 1; i >= 0; i--) {
+                try {
+                    allInterceptors.get(i).onError(invocation, e);
+                } catch (Exception ignored) {
+                }
+            }
+            throw e;
+        }
     }
     
     public Object executeTool(String toolName, JsonObject jsonParameters) throws Exception {
@@ -126,6 +172,18 @@ public class ToolExecutor {
     
     public int getToolCount() {
         return tools.size();
+    }
+    
+    public void addGlobalInterceptor(ToolInterceptor interceptor) {
+        globalInterceptors.add(interceptor);
+    }
+    
+    public void removeGlobalInterceptor(ToolInterceptor interceptor) {
+        globalInterceptors.remove(interceptor);
+    }
+    
+    public List<ToolInterceptor> getGlobalInterceptors() {
+        return new ArrayList<>(globalInterceptors);
     }
     
     private boolean isPrimitiveOrString(Class<?> clazz) {

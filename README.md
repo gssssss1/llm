@@ -7,8 +7,14 @@
 ### 1. JSON Schema Generator
 自动将 Java POJO 转换为 JSON Schema，支持复杂类型和丰富的注解。
 
-### 2. LLM Tool Executor ⭐ NEW
+### 2. LLM Tool Executor ⭐
 通过注解定义 LLM 工具，自动生成 Schema，支持动态执行。
+
+### 3. Tool 拦截器系统 ⭐ NEW
+前置/后置处理器，支持日志、监控、验证等功能。
+
+### 4. LLM Message 领域模型 ⭐ NEW
+完整的消息模型，支持 OpenAI 和 Anthropic 格式。
 
 ## 功能特性
 
@@ -29,6 +35,23 @@
 - ✅ 支持多种参数格式（JSON、Map、无参数）
 - ✅ 兼容 OpenAI、Anthropic 等主流 LLM 平台
 - ✅ 完整的单元测试和示例
+
+### Tool 拦截器系统 ⭐ NEW
+- ✅ 前置处理 (before)
+- ✅ 后置处理 (after)
+- ✅ 错误处理 (onError)
+- ✅ 全局和方法级别配置
+- ✅ 内置日志、计时、验证拦截器
+- ✅ 支持自定义拦截器
+
+### LLM Message 模型 ⭐ NEW
+- ✅ 完整的消息类型（System, User, Assistant, Tool）
+- ✅ Tool Calling 支持
+- ✅ OpenAI 格式转换
+- ✅ Anthropic 格式转换
+- ✅ 对话管理 (Conversation)
+- ✅ Builder 模式
+- ✅ 消息元数据
 
 ## 快速开始
 
@@ -220,6 +243,51 @@ Object toolResult = executor.executeTool(toolName, arguments);
 ```
 
 **详细文档**: 查看 [TOOL_EXECUTOR_README.md](TOOL_EXECUTOR_README.md) 获取完整使用指南。
+
+### 快速开始 - Tool 拦截器 ⭐
+
+```java
+// 1. 在 Tool 注解中配置拦截器
+@Tool(
+    description = "Get weather",
+    interceptors = {LoggingInterceptor.class, TimingInterceptor.class}
+)
+public String getWeather(WeatherRequest request) {
+    return "Weather info...";
+}
+
+// 2. 或添加全局拦截器
+ToolExecutor executor = new ToolExecutor();
+executor.addGlobalInterceptor(new LoggingInterceptor());
+executor.addGlobalInterceptor(new TimingInterceptor());
+```
+
+**详细文档**: 查看 [INTERCEPTOR_AND_MESSAGE_README.md](INTERCEPTOR_AND_MESSAGE_README.md)
+
+### 快速开始 - LLM Message 模型 ⭐
+
+```java
+// 构建对话
+Conversation conversation = new Conversation();
+conversation.addSystem("You are helpful");
+conversation.addUser("What's the weather?");
+
+// 助手调用工具
+AssistantMessage assistantMsg = new AssistantMessage();
+assistantMsg.addToolCall("call_123", "getWeather", "{\"city\":\"Paris\"}");
+conversation.addMessage(assistantMsg);
+
+// 添加工具结果
+conversation.addTool("call_123", "Weather: Sunny, 20°C");
+
+// 转换为 OpenAI 格式
+JsonArray messages = conversation.toOpenAIFormat();
+
+// 或 Anthropic 格式
+JsonArray messages = conversation.toAnthropicFormat();
+```
+
+**详细文档**: 查看 [INTERCEPTOR_AND_MESSAGE_README.md](INTERCEPTOR_AND_MESSAGE_README.md)
 
 ## 注解说明
 
