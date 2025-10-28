@@ -1,9 +1,18 @@
-# Java JSON Schema Generator
+# Java JSON Schema Generator + LLM Tool Executor
 
-一个用于将 Java 普通对象（POJO）转换为 JSON Schema 格式的工具，专门针对大模型 Tool/Function Calling 的参数定义进行了优化。
+一个用于将 Java 普通对象（POJO）转换为 JSON Schema 格式的工具，并提供完整的 LLM Tool 执行器，专门针对大模型 Tool/Function Calling 进行了优化。
+
+## 🎯 核心组件
+
+### 1. JSON Schema Generator
+自动将 Java POJO 转换为 JSON Schema，支持复杂类型和丰富的注解。
+
+### 2. LLM Tool Executor ⭐ NEW
+通过注解定义 LLM 工具，自动生成 Schema，支持动态执行。
 
 ## 功能特性
 
+### JSON Schema Generator
 - ✅ 支持基本数据类型映射（String, Integer, Long, Double, Boolean 等）
 - ✅ 支持复杂对象和嵌套对象
 - ✅ 支持集合类型（List, Set, Array）
@@ -12,6 +21,14 @@
 - ✅ 通过 Java 注解支持 schema 元数据
 - ✅ 符合 JSON Schema Draft 7 规范
 - ✅ 适配大模型 API（OpenAI, Anthropic 等）的 function calling schema 格式
+
+### LLM Tool Executor ⭐
+- ✅ `@Tool` 注解定义工具方法
+- ✅ 自动生成工具的 JSON Schema
+- ✅ 动态执行工具（根据 LLM 返回的参数）
+- ✅ 支持多种参数格式（JSON、Map、无参数）
+- ✅ 兼容 OpenAI、Anthropic 等主流 LLM 平台
+- ✅ 完整的单元测试和示例
 
 ## 快速开始
 
@@ -30,7 +47,7 @@ cd java-jsonschema-generator
 mvn clean install
 ```
 
-### 基本使用
+### 快速开始 - JSON Schema Generator
 
 #### 1. 定义 POJO 类
 
@@ -126,6 +143,84 @@ System.out.println(functionSchema.toString());
 }
 ```
 
+### 快速开始 - LLM Tool Executor ⭐
+
+#### 1. 定义工具参数类
+
+```java
+@SchemaDescription("Weather query parameters")
+public class WeatherRequest {
+    @SchemaProperty(required = true)
+    @SchemaDescription("The city name")
+    private String city;
+    
+    @SchemaProperty(enumValues = {"celsius", "fahrenheit"})
+    @SchemaDescription("Temperature unit")
+    private String unit = "celsius";
+    
+    // Getters and setters...
+}
+```
+
+#### 2. 定义工具方法
+
+```java
+import com.jsonschema.annotations.Tool;
+
+public class WeatherTools {
+    @Tool(description = "Get current weather for a city")
+    public String getWeather(WeatherRequest request) {
+        // 实现获取天气的逻辑
+        return "Weather in " + request.getCity() + ": Sunny, 25°C";
+    }
+    
+    @Tool(description = "Get current time")
+    public String getCurrentTime() {
+        // 无参数工具
+        return LocalDateTime.now().toString();
+    }
+}
+```
+
+#### 3. 注册和执行工具
+
+```java
+import com.jsonschema.tool.ToolExecutor;
+
+// 创建执行器并注册工具
+ToolExecutor executor = new ToolExecutor();
+executor.registerTool(new WeatherTools());
+
+// 获取工具 Schema（发送给 LLM）
+List<JsonObject> schemas = executor.getAllToolSchemas();
+
+// 执行工具（根据 LLM 的返回）
+String params = "{\"city\":\"Beijing\",\"unit\":\"celsius\"}";
+Object result = executor.executeTool("getWeather", params);
+System.out.println(result);  // Weather in Beijing: Sunny, 25°C
+```
+
+#### 4. 与 OpenAI 集成
+
+```java
+// 1. 获取工具 Schema 发送给 OpenAI
+JsonArray tools = new JsonArray();
+for (JsonObject schema : executor.getAllToolSchemas()) {
+    tools.add(schema);
+}
+
+// 2. LLM 返回要调用的工具
+String toolName = "getWeather";
+String arguments = "{\"city\":\"Paris\",\"unit\":\"celsius\"}";
+
+// 3. 执行工具
+Object toolResult = executor.executeTool(toolName, arguments);
+
+// 4. 将结果返回给 LLM
+```
+
+**详细文档**: 查看 [TOOL_EXECUTOR_README.md](TOOL_EXECUTOR_README.md) 获取完整使用指南。
+
 ## 注解说明
 
 ### @SchemaDescription
@@ -182,6 +277,20 @@ private String status;
 ```java
 @SchemaIgnore
 private String internalToken;
+```
+
+### @Tool
+
+标记方法为 LLM 可调用的工具。
+
+```java
+@Tool(
+    name = "custom_name",          // 可选，默认为方法名
+    description = "Tool description" // 必填，工具的描述
+)
+public String myTool(RequestParams params) {
+    // 工具实现
+}
 ```
 
 ## 支持的数据类型
