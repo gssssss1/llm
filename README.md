@@ -16,6 +16,9 @@
 ### 4. LLM Message 领域模型 ⭐ NEW
 完整的消息模型，支持 OpenAI 和 Anthropic 格式。
 
+### 5. LLM 客户端 ⭐ NEW
+基于 OkHttp 的 HTTP 客户端，支持 OpenAI 和 Anthropic API 调用。
+
 ## 功能特性
 
 ### JSON Schema Generator
@@ -52,6 +55,16 @@
 - ✅ 对话管理 (Conversation)
 - ✅ Builder 模式
 - ✅ 消息元数据
+
+### LLM 客户端 ⭐ NEW
+- ✅ OpenAI 客户端
+- ✅ Anthropic 客户端
+- ✅ 统一的接口设计
+- ✅ 类型安全的请求/响应
+- ✅ Builder 模式构建请求
+- ✅ 自动格式转换
+- ✅ 完整的错误处理
+- ✅ 可配置超时和重试
 
 ## 快速开始
 
@@ -288,6 +301,85 @@ JsonArray messages = conversation.toAnthropicFormat();
 ```
 
 **详细文档**: 查看 [INTERCEPTOR_AND_MESSAGE_README.md](INTERCEPTOR_AND_MESSAGE_README.md)
+
+### 快速开始 - LLM 客户端 ⭐
+
+```java
+// 创建 OpenAI 客户端
+OpenAIClient client = OpenAIClient.builder()
+    .apiKey("your-api-key")
+    .build();
+
+try {
+    // 构建请求
+    ChatRequest request = ChatRequestBuilder.create("gpt-3.5-turbo")
+        .message(MessageBuilder.user("What is 2+2?"))
+        .temperature(0.7)
+        .maxTokens(100)
+        .build();
+    
+    // 发送请求
+    ChatResponse response = client.chat(request);
+    System.out.println(response.getAssistantMessage().getContent());
+    
+} catch (IOException e) {
+    e.printStackTrace();
+} finally {
+    client.close();
+}
+```
+
+**完整调用示例（包含 Tool Calling）:**
+
+```java
+OpenAIClient client = OpenAIClient.builder()
+    .apiKey(System.getenv("OPENAI_API_KEY"))
+    .build();
+
+ToolExecutor toolExecutor = new ToolExecutor();
+toolExecutor.registerTool(new WeatherTools());
+
+Conversation conversation = new Conversation();
+conversation.addUser("What's the weather in Tokyo?");
+
+try {
+    // 发送请求
+    ChatRequest request = ChatRequestBuilder.create("gpt-4")
+        .conversation(conversation)
+        .tools(toolExecutor)
+        .build();
+    
+    ChatResponse response = client.chat(request);
+    AssistantMessage assistantMsg = response.getAssistantMessage();
+    
+    // 检查是否有工具调用
+    if (assistantMsg.hasToolCalls()) {
+        conversation.addMessage(assistantMsg);
+        
+        // 执行工具
+        for (ToolCall toolCall : assistantMsg.getToolCalls()) {
+            Object result = toolExecutor.executeTool(
+                toolCall.getName(),
+                toolCall.getArguments()
+            );
+            conversation.addTool(toolCall.getId(), result.toString());
+        }
+        
+        // 发送工具结果
+        ChatRequest followUp = ChatRequestBuilder.create("gpt-4")
+            .conversation(conversation)
+            .tools(toolExecutor)
+            .build();
+        
+        ChatResponse finalResponse = client.chat(followUp);
+        System.out.println(finalResponse.getAssistantMessage().getContent());
+    }
+} finally {
+    client.close();
+}
+```
+
+**详细文档**: 查看 [LLM_CLIENT_README.md](LLM_CLIENT_README.md)
 
 ## 注解说明
 
