@@ -162,6 +162,58 @@ public class Session {
         return content;
     }
     
+    public void sendMessageStream(String userMessage, StreamCallback streamCallback) throws IOException {
+        updateActivity();
+        
+        UserMessageEvent userEvent = new UserMessageEvent(sessionId, userMessage, userId);
+        emitEvent(userEvent);
+        
+        UserMessage userMsg = new UserMessage(userMessage);
+        conversation.addMessage(userMsg);
+        contextManager.addMessage(userMsg);
+        memory.add(userMsg);
+        
+        ChatRequest request = ChatRequestBuilder.create(model)
+                .messages(contextManager.compress())
+                .tools(toolExecutor)
+                .build();
+        
+        final StringBuilder fullContent = new StringBuilder();
+        
+        client.chatStream(request, new StreamCallback() {
+            @Override
+            public void onStart() {
+                streamCallback.onStart();
+            }
+            
+            @Override
+            public void onChunk(String content) {
+                fullContent.append(content);
+                streamCallback.onChunk(content);
+            }
+            
+            @Override
+            public void onComplete(String content) {
+                AssistantMessage assistantMsg = new AssistantMessage(fullContent.toString());
+                AssistantMessageEvent assistantEvent = new AssistantMessageEvent(
+                    sessionId, fullContent.toString(), model, 0
+                );
+                emitEvent(assistantEvent);
+                
+                conversation.addMessage(assistantMsg);
+                contextManager.addMessage(assistantMsg);
+                memory.add(assistantMsg);
+                
+                streamCallback.onComplete(content);
+            }
+            
+            @Override
+            public void onError(Exception error) {
+                streamCallback.onError(error);
+            }
+        });
+    }
+    
     public void addEventListener(EventHandler handler) {
         eventHandlers.add(handler);
     }

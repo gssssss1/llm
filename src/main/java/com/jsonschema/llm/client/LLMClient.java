@@ -9,5 +9,7 @@ public interface LLMClient {
     
     ChatResponse chat(ChatRequest request) throws IOException;
     
+    void chatStream(ChatRequest request, StreamCallback callback) throws IOException;
+    
     void close();
 }

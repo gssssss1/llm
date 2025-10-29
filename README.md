@@ -68,6 +68,7 @@
 - ✅ 自动格式转换
 - ✅ 完整的错误处理
 - ✅ 可配置超时和重试
+- ✅ 流式返回支持 (Streaming) ⭐ NEW
 
 ### Session 与事件驱动 ⭐ NEW
 - ✅ 事件驱动架构
@@ -393,6 +394,75 @@ try {
 ```
 
 **详细文档**: 查看 [LLM_CLIENT_README.md](LLM_CLIENT_README.md)
+
+### 快速开始 - 流式返回 ⭐
+
+```java
+// 流式接收 LLM 响应
+OpenAIClient client = OpenAIClient.builder()
+    .apiKey("your-api-key")
+    .build();
+
+ChatRequest request = ChatRequestBuilder.create("gpt-3.5-turbo")
+    .message(MessageBuilder.user("Tell me a story"))
+    .build();
+
+client.chatStream(request, new StreamCallback() {
+    @Override
+    public void onStart() {
+        System.out.print("Assistant: ");
+    }
+    
+    @Override
+    public void onChunk(String content) {
+        System.out.print(content);  // 实时打印
+        System.out.flush();
+    }
+    
+    @Override
+    public void onComplete(String fullContent) {
+        System.out.println("\nDone!");
+    }
+    
+    @Override
+    public void onError(Exception error) {
+        error.printStackTrace();
+    }
+});
+```
+
+**Session 流式调用：**
+
+```java
+Session session = Session.builder()
+    .client(client)
+    .model("gpt-3.5-turbo")
+    .build();
+
+session.sendMessageStream("Tell me a joke", new StreamCallback() {
+    @Override
+    public void onStart() {
+        // 开始接收
+    }
+    
+    @Override
+    public void onChunk(String content) {
+        System.out.print(content);
+    }
+    
+    @Override
+    public void onComplete(String fullContent) {
+        System.out.println();
+    }
+    
+    @Override
+    public void onError(Exception error) {
+        error.printStackTrace();
+    }
+});
+```
+
+**详细文档**: 查看 [STREAMING_README.md](STREAMING_README.md)
 
 ### 快速开始 - Session 会话管理 ⭐
 

@@ -66,6 +66,86 @@ public class OpenAIClient implements LLMClient {
     }
     
     @Override
+    public void chatStream(ChatRequest request, StreamCallback callback) throws IOException {
+        String url = baseUrl + "/chat/completions";
+        
+        JsonObject requestJson = request.toOpenAIJson();
+        requestJson.addProperty("stream", true);
+        
+        RequestBody body = RequestBody.create(requestJson.toString(), JSON);
+        
+        Request httpRequest = new Request.Builder()
+                .url(url)
+                .addHeader("Authorization", "Bearer " + apiKey)
+                .addHeader("Content-Type", "application/json")
+                .post(body)
+                .build();
+        
+        try (Response response = httpClient.newCall(httpRequest).execute()) {
+            if (!response.isSuccessful()) {
+                String errorBody = response.body() != null ? response.body().string() : "Unknown error";
+                callback.onError(new IOException("OpenAI API call failed: " + response.code() + " - " + errorBody));
+                return;
+            }
+            
+            callback.onStart();
+            
+            StringBuilder fullContent = new StringBuilder();
+            
+            try {
+                ResponseBody responseBody = response.body();
+                if (responseBody == null) {
+                    callback.onError(new IOException("Empty response body"));
+                    return;
+                }
+                
+                String line;
+                java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(responseBody.byteStream())
+                );
+                
+                while ((line = reader.readLine()) != null) {
+                    if (line.startsWith("data: ")) {
+                        String data = line.substring(6);
+                        
+                        if ("[DONE]".equals(data)) {
+                            callback.onComplete(fullContent.toString());
+                            break;
+                        }
+                        
+                        try {
+                            JsonObject chunk = JsonParser.parseString(data).getAsJsonObject();
+                            
+                            if (chunk.has("choices") && chunk.getAsJsonArray("choices").size() > 0) {
+                                JsonObject choice = chunk.getAsJsonArray("choices").get(0).getAsJsonObject();
+                                
+                                if (choice.has("delta")) {
+                                    JsonObject delta = choice.getAsJsonObject("delta");
+                                    
+                                    if (delta.has("content") && !delta.get("content").isJsonNull()) {
+                                        String content = delta.get("content").getAsString();
+                                        fullContent.append(content);
+                                        callback.onChunk(content);
+                                    }
+                                }
+                                
+                                if (choice.has("finish_reason") && !choice.get("finish_reason").isJsonNull()) {
+                                    callback.onComplete(fullContent.toString());
+                                    break;
+                                }
+                            }
+                        } catch (Exception e) {
+                            // Skip malformed chunks
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                callback.onError(e);
+            }
+        }
+    }
+    
+    @Override
     public void close() {
         httpClient.dispatcher().executorService().shutdown();
         httpClient.connectionPool().evictAll();
