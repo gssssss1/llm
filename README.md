@@ -2,11 +2,18 @@
 
 A Java-native implementation of LangGraph for stateful workflow orchestration, leveraging Java 21 features for modern, high-performance execution.
 
-## 🎉 New: Web UI Available!
+## 🎉 New: Web UI with Dynamic Execution Graph!
 
-Now includes a **Spring Boot Web UI** for visualizing and monitoring your workflows in real-time!
+Now includes a **Spring Boot Web UI** with **real-time dynamic execution visualization**!
 
-🌐 **[Web UI Guide](WEB_UI_GUIDE.md)** - Complete documentation for the Web interface
+🌐 **[Web UI Guide](WEB_UI_GUIDE.md)** - Complete documentation for the Web interface  
+🎬 **[Dynamic Graph Guide](DYNAMIC_GRAPH_GUIDE.md)** - Learn about the dynamic execution visualization
+
+**Key Features:**
+- 📊 **Dynamic Execution Graph** - Watch nodes execute in real-time
+- 🎨 **Status Colors** - Visual feedback for running, completed, and failed nodes
+- ⚡ **Live Updates** - WebSocket-powered real-time updates
+- 📈 **Multiple Views** - Static Mermaid diagrams and dynamic execution flow
 
 **Quick Start Web UI:**
 ```bash
@@ -26,6 +33,7 @@ mvn spring-boot:run -Dstart-class=com.langgraph.web.WebUIDemo
 - **Plugin System**: Extensible with custom plugins
 - **Immutable State**: All state is immutable, preventing shared state mutations
 - **🆕 Web UI**: Real-time graph visualization and execution monitoring
+- **🆕 Dynamic Execution Graph**: Watch workflow execution in real-time with animated nodes
 
 ## Requirements
 

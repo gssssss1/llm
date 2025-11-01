@@ -6,9 +6,11 @@
     <title>Graph View - LangGraph</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="/css/dynamic-graph.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/stomp-websocket@2.3.4/lib/stomp.min.js"></script>
+    <script src="/js/dynamic-graph.js"></script>
     <style>
         .execution-log {
             max-height: 400px;
@@ -68,18 +70,54 @@
 
         <div class="row">
             <div class="col-lg-8 mb-4">
-                <div class="card shadow">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0"><i class="bi bi-diagram-2"></i> Graph Visualization</h5>
+                <!-- Tabs for switching between static and dynamic views -->
+                <ul class="nav nav-tabs mb-3" id="graphViewTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="static-tab" data-bs-toggle="tab" 
+                                data-bs-target="#static-view" type="button" role="tab">
+                            <i class="bi bi-diagram-2"></i> 静态图
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="dynamic-tab" data-bs-toggle="tab" 
+                                data-bs-target="#dynamic-view" type="button" role="tab">
+                            <i class="bi bi-play-btn"></i> 动态执行图
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="graphViewContent">
+                    <!-- Static Graph View -->
+                    <div class="tab-pane fade show active" id="static-view" role="tabpanel">
+                        <div class="card shadow">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="bi bi-diagram-2"></i> Graph结构图</h5>
+                            </div>
+                            <div class="card-body graph-diagram">
+                                <div id="mermaidDiagram">Loading diagram...</div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-body graph-diagram">
-                        <div id="mermaidDiagram">Loading diagram...</div>
+
+                    <!-- Dynamic Execution Graph View -->
+                    <div class="tab-pane fade" id="dynamic-view" role="tabpanel">
+                        <div class="card shadow">
+                            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="bi bi-play-btn"></i> 实时执行图</h5>
+                                <button class="btn btn-sm btn-light" onclick="resetDynamicGraph()">
+                                    <i class="bi bi-arrow-clockwise"></i> 重置
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div id="dynamicGraphContainer"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <div class="card shadow mt-4">
                     <div class="card-header bg-info text-white">
-                        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Graph Information</h5>
+                        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Graph信息</h5>
                     </div>
                     <div class="card-body">
                         <div class="row" id="graphInfo">
@@ -139,6 +177,8 @@
         const graphId = /*[[${graphId}]]*/ 'graph-1';
         let stompClient = null;
         let currentExecutionId = null;
+        let dynamicGraph = null;
+        let graphData = null;
 
         mermaid.initialize({ startOnLoad: true, theme: 'default' });
 
@@ -146,6 +186,7 @@
             try {
                 const response = await fetch(`/api/graphs/${graphId}`);
                 const data = await response.json();
+                graphData = data;
                 
                 document.getElementById('graphInfo').innerHTML = `
                     <div class="col-md-6">
@@ -203,9 +244,30 @@
                     const event = JSON.parse(message.body);
                     if (!currentExecutionId || event.executionId === currentExecutionId) {
                         addLogEntry(event);
+                        updateDynamicGraph(event);
                     }
                 });
             });
+        }
+
+        function updateDynamicGraph(event) {
+            if (!dynamicGraph) return;
+            
+            const eventType = event.eventType;
+            const nodeName = event.nodeName;
+            
+            if (eventType === 'EXECUTION_STARTED') {
+                dynamicGraph.reset();
+                if (graphData && graphData.startNode) {
+                    dynamicGraph.onNodeStarted(graphData.startNode);
+                }
+            } else if (eventType === 'NODE_STARTED' && nodeName) {
+                dynamicGraph.onNodeStarted(nodeName);
+            } else if (eventType === 'NODE_COMPLETED' && nodeName) {
+                dynamicGraph.onNodeCompleted(nodeName);
+            } else if (eventType === 'NODE_FAILED' && nodeName) {
+                dynamicGraph.onNodeFailed(nodeName);
+            }
         }
 
         function addLogEntry(event) {
@@ -254,6 +316,10 @@
                 const initialState = JSON.parse(initialStateText);
                 
                 logDiv.innerHTML = '';
+                if (dynamicGraph) {
+                    dynamicGraph.reset();
+                }
+                
                 statusDiv.innerHTML = '<div class="alert alert-info"><i class="bi bi-hourglass-split"></i> Starting execution...</div>';
                 
                 const response = await fetch(`/api/graphs/${graphId}/execute`, {
@@ -281,10 +347,31 @@
             }
         }
 
+        function resetDynamicGraph() {
+            if (dynamicGraph) {
+                dynamicGraph.reset();
+            }
+        }
+
+        function initDynamicGraph() {
+            dynamicGraph = new DynamicExecutionGraph('dynamicGraphContainer');
+            if (graphData) {
+                dynamicGraph.setGraphData(graphData);
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
-            loadGraphData();
+            loadGraphData().then(() => {
+                initDynamicGraph();
+            });
             loadMermaidDiagram();
             connectWebSocket();
+            
+            document.getElementById('dynamic-tab').addEventListener('shown.bs.tab', function() {
+                if (!dynamicGraph) {
+                    initDynamicGraph();
+                }
+            });
         });
     </script>
 </body>
