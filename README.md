@@ -2,6 +2,18 @@
 
 A Java-native implementation of LangGraph for stateful workflow orchestration, leveraging Java 21 features for modern, high-performance execution.
 
+## 🎉 New: Web UI Available!
+
+Now includes a **Spring Boot Web UI** for visualizing and monitoring your workflows in real-time!
+
+🌐 **[Web UI Guide](WEB_UI_GUIDE.md)** - Complete documentation for the Web interface
+
+**Quick Start Web UI:**
+```bash
+mvn spring-boot:run -Dstart-class=com.langgraph.web.WebUIDemo
+# Then open http://localhost:8080
+```
+
 ## Features
 
 - **Type-Safe State Management**: Generic bounded types with sealed interfaces
@@ -13,6 +25,7 @@ A Java-native implementation of LangGraph for stateful workflow orchestration, l
 - **Graph Visualization**: Multiple output formats (ASCII, Mermaid, DOT)
 - **Plugin System**: Extensible with custom plugins
 - **Immutable State**: All state is immutable, preventing shared state mutations
+- **🆕 Web UI**: Real-time graph visualization and execution monitoring
 
 ## Requirements
 

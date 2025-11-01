@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graph View - LangGraph</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stomp-websocket@2.3.4/lib/stomp.min.js"></script>
+    <style>
+        .execution-log {
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+        .log-entry {
+            padding: 8px;
+            border-left: 3px solid #dee2e6;
+            margin-bottom: 5px;
+            background-color: #f8f9fa;
+        }
+        .log-entry.started {
+            border-left-color: #0d6efd;
+            background-color: #e7f1ff;
+        }
+        .log-entry.completed {
+            border-left-color: #198754;
+            background-color: #d1e7dd;
+        }
+        .log-entry.failed {
+            border-left-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        .graph-diagram {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            min-height: 400px;
+        }
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-diagram-3"></i> LangGraph Web UI
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">Home</a>
+                <a class="nav-link" href="/executions">Executions</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row mb-3">
+            <div class="col">
+                <h2><i class="bi bi-diagram-3"></i> Graph: <span id="graphTitle" th:text="${graphId}"></span></h2>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-8 mb-4">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="bi bi-diagram-2"></i> Graph Visualization</h5>
+                    </div>
+                    <div class="card-body graph-diagram">
+                        <div id="mermaidDiagram">Loading diagram...</div>
+                    </div>
+                </div>
+
+                <div class="card shadow mt-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Graph Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="graphInfo">
+                            <div class="col-12 text-center">
+                                <div class="spinner-border text-primary" role="status"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card shadow stats-card mb-3">
+                    <div class="card-body text-center">
+                        <h6>Graph Statistics</h6>
+                        <div id="graphStats" class="mt-3">
+                            <div class="spinner-border spinner-border-sm" role="status"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="bi bi-play-circle"></i> Execute Graph</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Initial State (JSON):</label>
+                            <textarea class="form-control" id="initialStateInput" rows="4" 
+                                      placeholder='{"key": "value"}'>{}</textarea>
+                        </div>
+                        <button class="btn btn-success w-100" onclick="executeGraph()">
+                            <i class="bi bi-play-fill"></i> Execute
+                        </button>
+                        <div id="executionStatus" class="mt-3"></div>
+                    </div>
+                </div>
+
+                <div class="card shadow mt-3">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="bi bi-terminal"></i> Execution Log</h5>
+                        <small class="text-muted">Real-time</small>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="executionLog" class="execution-log p-2">
+                            <p class="text-muted text-center py-4">
+                                <i class="bi bi-info-circle"></i> Execute the graph to see logs
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        const graphId = /*[[${graphId}]]*/ 'graph-1';
+        let stompClient = null;
+        let currentExecutionId = null;
+
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+
+        async function loadGraphData() {
+            try {
+                const response = await fetch(`/api/graphs/${graphId}`);
+                const data = await response.json();
+                
+                document.getElementById('graphInfo').innerHTML = `
+                    <div class="col-md-6">
+                        <strong>Start Node:</strong> ${data.startNode || 'N/A'}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>End Node:</strong> ${data.endNode || 'N/A'}
+                    </div>
+                    <div class="col-md-6 mt-2">
+                        <strong>Total Nodes:</strong> ${data.nodes.length}
+                    </div>
+                    <div class="col-md-6 mt-2">
+                        <strong>Total Edges:</strong> ${data.edges.length}
+                    </div>
+                `;
+
+                const stats = data.stats;
+                document.getElementById('graphStats').innerHTML = `
+                    <div class="row">
+                        <div class="col-6 mb-2"><strong>${stats.nodeCount}</strong><br>Nodes</div>
+                        <div class="col-6 mb-2"><strong>${stats.edgeCount}</strong><br>Edges</div>
+                        <div class="col-4"><strong>${stats.staticEdges}</strong><br>Static</div>
+                        <div class="col-4"><strong>${stats.conditionalEdges}</strong><br>Conditional</div>
+                        <div class="col-4"><strong>${stats.parallelEdges}</strong><br>Parallel</div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading graph:', error);
+            }
+        }
+
+        async function loadMermaidDiagram() {
+            try {
+                const response = await fetch(`/api/graphs/${graphId}/mermaid`);
+                const data = await response.json();
+                
+                const element = document.getElementById('mermaidDiagram');
+                element.innerHTML = '<div class="mermaid">' + data.diagram + '</div>';
+                mermaid.init(undefined, element.querySelector('.mermaid'));
+            } catch (error) {
+                console.error('Error loading diagram:', error);
+                document.getElementById('mermaidDiagram').innerHTML = 
+                    '<div class="alert alert-danger">Error loading diagram</div>';
+            }
+        }
+
+        function connectWebSocket() {
+            const socket = new SockJS('/ws');
+            stompClient = Stomp.over(socket);
+            
+            stompClient.connect({}, function(frame) {
+                console.log('Connected: ' + frame);
+                
+                stompClient.subscribe('/topic/executions/all', function(message) {
+                    const event = JSON.parse(message.body);
+                    if (!currentExecutionId || event.executionId === currentExecutionId) {
+                        addLogEntry(event);
+                    }
+                });
+            });
+        }
+
+        function addLogEntry(event) {
+            const logDiv = document.getElementById('executionLog');
+            const timestamp = new Date(event.timestamp).toLocaleTimeString();
+            
+            let className = 'log-entry';
+            let icon = 'bi-circle';
+            
+            if (event.eventType.includes('STARTED')) {
+                className += ' started';
+                icon = 'bi-play-circle';
+            } else if (event.eventType.includes('COMPLETED')) {
+                className += ' completed';
+                icon = 'bi-check-circle';
+            } else if (event.eventType.includes('FAILED')) {
+                className += ' failed';
+                icon = 'bi-x-circle';
+            }
+            
+            const entry = document.createElement('div');
+            entry.className = className;
+            entry.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <i class="bi ${icon}"></i>
+                        <strong>${event.nodeName || 'Execution'}</strong>
+                    </div>
+                    <small class="text-muted">${timestamp}</small>
+                </div>
+                <div class="mt-1">
+                    <small>${event.message}</small>
+                </div>
+            `;
+            
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        async function executeGraph() {
+            const statusDiv = document.getElementById('executionStatus');
+            const logDiv = document.getElementById('executionLog');
+            
+            try {
+                const initialStateText = document.getElementById('initialStateInput').value;
+                const initialState = JSON.parse(initialStateText);
+                
+                logDiv.innerHTML = '';
+                statusDiv.innerHTML = '<div class="alert alert-info"><i class="bi bi-hourglass-split"></i> Starting execution...</div>';
+                
+                const response = await fetch(`/api/graphs/${graphId}/execute`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(initialState)
+                });
+                
+                const data = await response.json();
+                currentExecutionId = data.executionId;
+                
+                statusDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle"></i> Execution started
+                        <br><small>ID: ${data.executionId}</small>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error executing graph:', error);
+                statusDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle"></i> Error: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadGraphData();
+            loadMermaidDiagram();
+            connectWebSocket();
+        });
+    </script>
+</body>
+</html>

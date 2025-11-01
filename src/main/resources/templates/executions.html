@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Executions - LangGraph</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        .execution-card {
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+        .execution-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        }
+        .log-detail {
+            max-height: 500px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-diagram-3"></i> LangGraph Web UI
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">Home</a>
+                <a class="nav-link active" href="/executions">Executions</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row mb-3">
+            <div class="col">
+                <h2><i class="bi bi-clock-history"></i> Execution History</h2>
+            </div>
+            <div class="col text-end">
+                <button class="btn btn-primary" onclick="loadExecutions()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+                <button class="btn btn-danger" onclick="clearAllLogs()">
+                    <i class="bi bi-trash"></i> Clear All
+                </button>
+            </div>
+        </div>
+
+        <div class="row" id="executionsList">
+            <div class="col-12 text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-3 text-muted">Loading executions...</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="logDetailModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-journal-text"></i> Execution Logs: <span id="modalExecutionId"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="logDetailContent" class="log-detail"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let logDetailModal;
+
+        async function loadExecutions() {
+            try {
+                const response = await fetch('/api/executions/logs');
+                const data = await response.json();
+                
+                const executionsList = document.getElementById('executionsList');
+                
+                if (Object.keys(data).length > 0) {
+                    executionsList.innerHTML = Object.entries(data).map(([executionId, logs]) => {
+                        const startTime = logs[0]?.timestamp ? new Date(logs[0].timestamp).toLocaleString() : 'N/A';
+                        const lastLog = logs[logs.length - 1];
+                        const status = lastLog?.eventType.includes('COMPLETED') ? 'success' : 
+                                     lastLog?.eventType.includes('FAILED') ? 'danger' : 'primary';
+                        
+                        return `
+                            <div class="col-md-6 col-lg-4 mb-3">
+                                <div class="card execution-card" onclick="showExecutionDetail('${executionId}')">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <h6 class="card-title mb-0">
+                                                <i class="bi bi-box-arrow-in-right"></i>
+                                                ${executionId.substring(0, 8)}...
+                                            </h6>
+                                            <span class="badge bg-${status}">${logs.length} events</span>
+                                        </div>
+                                        <p class="card-text">
+                                            <small class="text-muted">
+                                                <i class="bi bi-clock"></i> ${startTime}
+                                            </small>
+                                        </p>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="badge bg-${status}">
+                                                ${lastLog?.eventType || 'UNKNOWN'}
+                                            </span>
+                                            <button class="btn btn-sm btn-outline-danger" onclick="deleteExecution(event, '${executionId}')">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    executionsList.innerHTML = `
+                        <div class="col-12 text-center py-5">
+                            <i class="bi bi-inbox" style="font-size: 4rem; color: #dee2e6;"></i>
+                            <h5 class="mt-3 text-muted">No Executions Found</h5>
+                            <p class="text-muted">Execute a graph to see logs here</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading executions:', error);
+                document.getElementById('executionsList').innerHTML = `
+                    <div class="col-12 text-center py-5">
+                        <i class="bi bi-exclamation-triangle text-danger" style="font-size: 4rem;"></i>
+                        <h5 class="mt-3 text-danger">Error Loading Executions</h5>
+                        <p class="text-muted">${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function showExecutionDetail(executionId) {
+            try {
+                const response = await fetch(`/api/executions/${executionId}/logs`);
+                const logs = await response.json();
+                
+                document.getElementById('modalExecutionId').textContent = executionId;
+                
+                const content = logs.map((log, index) => {
+                    const timestamp = new Date(log.timestamp).toLocaleTimeString();
+                    let bgClass = '';
+                    let icon = 'bi-circle';
+                    
+                    if (log.eventType.includes('STARTED')) {
+                        bgClass = 'bg-info bg-opacity-10';
+                        icon = 'bi-play-circle';
+                    } else if (log.eventType.includes('COMPLETED')) {
+                        bgClass = 'bg-success bg-opacity-10';
+                        icon = 'bi-check-circle';
+                    } else if (log.eventType.includes('FAILED')) {
+                        bgClass = 'bg-danger bg-opacity-10';
+                        icon = 'bi-x-circle';
+                    }
+                    
+                    return `
+                        <div class="p-2 mb-2 rounded ${bgClass}">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <i class="bi ${icon}"></i>
+                                    <strong>#${index + 1} ${log.eventType}</strong>
+                                    ${log.nodeName ? `- ${log.nodeName}` : ''}
+                                </div>
+                                <small class="text-muted">${timestamp}</small>
+                            </div>
+                            <div class="mt-1">
+                                <small>${log.message}</small>
+                            </div>
+                            ${log.data && Object.keys(log.data).length > 0 ? `
+                                <details class="mt-2">
+                                    <summary class="text-muted" style="cursor: pointer;">
+                                        <small>View data</small>
+                                    </summary>
+                                    <pre class="mt-2 mb-0" style="font-size: 0.75rem;">${JSON.stringify(log.data, null, 2)}</pre>
+                                </details>
+                            ` : ''}
+                        </div>
+                    `;
+                }).join('');
+                
+                document.getElementById('logDetailContent').innerHTML = content;
+                logDetailModal.show();
+            } catch (error) {
+                console.error('Error loading execution detail:', error);
+            }
+        }
+
+        async function deleteExecution(event, executionId) {
+            event.stopPropagation();
+            
+            if (!confirm(`Delete logs for execution ${executionId}?`)) {
+                return;
+            }
+            
+            try {
+                await fetch(`/api/executions/${executionId}/logs`, { method: 'DELETE' });
+                await loadExecutions();
+            } catch (error) {
+                console.error('Error deleting execution:', error);
+                alert('Error deleting execution logs');
+            }
+        }
+
+        async function clearAllLogs() {
+            if (!confirm('Clear all execution logs?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/executions/logs');
+                const data = await response.json();
+                
+                for (const executionId of Object.keys(data)) {
+                    await fetch(`/api/executions/${executionId}/logs`, { method: 'DELETE' });
+                }
+                
+                await loadExecutions();
+            } catch (error) {
+                console.error('Error clearing logs:', error);
+                alert('Error clearing all logs');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            logDetailModal = new bootstrap.Modal(document.getElementById('logDetailModal'));
+            loadExecutions();
+        });
+    </script>
+</body>
+</html>

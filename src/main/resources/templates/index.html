@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LangGraph Web UI</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .hero-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 60px 0;
+            margin-bottom: 40px;
+        }
+        .feature-card {
+            transition: transform 0.3s;
+            height: 100%;
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .graph-card {
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .graph-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-diagram-3"></i> LangGraph Web UI
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/executions">Executions</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="hero-section">
+        <div class="container text-center">
+            <h1 class="display-4 fw-bold mb-3">
+                <i class="bi bi-diagram-3-fill"></i> LangGraph Dashboard
+            </h1>
+            <p class="lead">Visualize and monitor your workflow graphs in real-time</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="row mb-5">
+            <div class="col-md-4 mb-4">
+                <div class="card feature-card">
+                    <div class="card-body text-center">
+                        <i class="bi bi-eye text-primary" style="font-size: 3rem;"></i>
+                        <h5 class="card-title mt-3">Graph Visualization</h5>
+                        <p class="card-text">View your workflow graphs with interactive diagrams</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card feature-card">
+                    <div class="card-body text-center">
+                        <i class="bi bi-play-circle text-success" style="font-size: 3rem;"></i>
+                        <h5 class="card-title mt-3">Real-time Execution</h5>
+                        <p class="card-text">Monitor workflow execution with live updates</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card feature-card">
+                    <div class="card-body text-center">
+                        <i class="bi bi-journal-text text-info" style="font-size: 3rem;"></i>
+                        <h5 class="card-title mt-3">Execution Logs</h5>
+                        <p class="card-text">Track detailed logs for each node execution</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="bi bi-diagram-2"></i> Available Graphs</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="graphsList" class="row">
+                            <div class="col-12 text-center py-5">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-3 text-muted">Loading graphs...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="mt-5 py-4 bg-dark text-white text-center">
+        <div class="container">
+            <p class="mb-0">LangGraph Web UI &copy; 2024 | Powered by Java 21 & Spring Boot</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        async function loadGraphs() {
+            try {
+                const response = await fetch('/api/graphs');
+                const data = await response.json();
+                
+                const graphsList = document.getElementById('graphsList');
+                
+                if (data.graphs && data.graphs.length > 0) {
+                    graphsList.innerHTML = data.graphs.map(graphId => `
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card graph-card" onclick="window.location.href='/graph/${graphId}'">
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        <i class="bi bi-diagram-3"></i> ${graphId}
+                                    </h5>
+                                    <p class="card-text text-muted">Click to view and execute</p>
+                                    <div class="d-flex justify-content-between">
+                                        <span class="badge bg-primary">Graph</span>
+                                        <i class="bi bi-arrow-right-circle"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    graphsList.innerHTML = `
+                        <div class="col-12 text-center py-5">
+                            <i class="bi bi-inbox" style="font-size: 4rem; color: #dee2e6;"></i>
+                            <h5 class="mt-3 text-muted">No Graphs Available</h5>
+                            <p class="text-muted">Create a graph using the API to get started</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading graphs:', error);
+                document.getElementById('graphsList').innerHTML = `
+                    <div class="col-12 text-center py-5">
+                        <i class="bi bi-exclamation-triangle text-danger" style="font-size: 4rem;"></i>
+                        <h5 class="mt-3 text-danger">Error Loading Graphs</h5>
+                        <p class="text-muted">${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadGraphs);
+    </script>
+</body>
+</html>
