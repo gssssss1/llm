@@ -1,0 +1,66 @@
+{
+    "report_name": "Clinical Study Report",
+    "report_file_type": "excel",
+    "description": "Clinical study report with multiple sheets",
+    "schema": {
+        "sheet": [
+            {
+                "name": "Index",
+                "format_type": "key_value",
+                "description": "Index contains metadata of the task",
+                "columns": [
+                    {
+                        "name": "Study Name",
+                        "data_type": "string",
+                        "description": "Study name of the task",
+                        "required": true
+                    }
+                ]
+            },
+            {
+                "name": "Eligibility Guardrail",
+                "format_type": "tabular",
+                "description": "Business name of the task",
+                "columns": [
+                    {
+                        "name": "ELIG_Measurable_Lesion_V1",
+                        "data_type": "enum",
+                        "label": "ELIG_Measurable_Lesion_V1",
+                        "enum_values": [
+                            "a",
+                            "b"
+                        ],
+                        "description": "Version of the business",
+                        "required": true
+                    }
+                ]
+            },
+            {
+                "name": "Rules",
+                "format_type": "tabular",
+                "description": "Rules of validation",
+                "columns": [
+                    {
+                        "name": "ID",
+                        "data_type": "string",
+                        "description": "ID of the validation rule",
+                        "required": true
+                    }
+                ]
+            },
+            {
+                "name": "ELIG_Age_18_75_V1",
+                "description": "Rule name",
+                "format_type": "tabular",
+                "columns": [
+                    {
+                        "name": "USUBJID",
+                        "data_type": "string",
+                        "description": "Subject ID",
+                        "required": true
+                    }
+                ]
+            }
+        ]
+    }
+}
