@@ -4,28 +4,34 @@ import com.excel.schema.model.Column;
 import com.excel.schema.model.ExcelSchema;
 import com.excel.schema.model.FormatType;
 import com.excel.schema.model.Sheet;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class CsvGenerator {
     
     private final ExcelSchema schema;
-    private final String separator;
+    private final CSVFormat csvFormat;
     private final boolean includeHeaders;
     
     public CsvGenerator(ExcelSchema schema) {
-        this(schema, ",", true);
+        this(schema, CSVFormat.DEFAULT, true);
     }
     
     public CsvGenerator(ExcelSchema schema, String separator, boolean includeHeaders) {
+        this(schema, CSVFormat.DEFAULT.withDelimiter(separator.charAt(0)), includeHeaders);
+    }
+    
+    public CsvGenerator(ExcelSchema schema, CSVFormat csvFormat, boolean includeHeaders) {
         this.schema = schema;
-        this.separator = separator;
+        this.csvFormat = csvFormat;
         this.includeHeaders = includeHeaders;
     }
     
@@ -48,81 +54,65 @@ public class CsvGenerator {
     
     public void generateSheet(Sheet sheet, String filePath) throws IOException {
         try (BufferedWriter writer = new BufferedWriter(
-                new OutputStreamWriter(new FileOutputStream(filePath), StandardCharsets.UTF_8))) {
+                new OutputStreamWriter(new FileOutputStream(filePath), StandardCharsets.UTF_8));
+             CSVPrinter csvPrinter = new CSVPrinter(writer, csvFormat)) {
             
             if (sheet.getFormatType() == FormatType.KEY_VALUE) {
-                generateKeyValueCsv(writer, sheet);
+                generateKeyValueCsv(csvPrinter, sheet);
             } else if (sheet.getFormatType() == FormatType.TABULAR) {
-                generateTabularCsv(writer, sheet);
+                generateTabularCsv(csvPrinter, sheet);
             }
         }
     }
     
-    private void generateKeyValueCsv(BufferedWriter writer, Sheet sheet) throws IOException {
+    private void generateKeyValueCsv(CSVPrinter csvPrinter, Sheet sheet) throws IOException {
         List<Column> columns = sheet.getColumns();
         if (columns == null || columns.isEmpty()) {
             return;
         }
         
         if (includeHeaders) {
-            writer.write(escapeCsv("Key") + separator + escapeCsv("Value"));
-            writer.newLine();
+            csvPrinter.printRecord("Key", "Value");
         }
         
         for (Column column : columns) {
-            writer.write(escapeCsv(column.getName()) + separator);
-            writer.newLine();
+            csvPrinter.printRecord(column.getName(), "");
         }
     }
     
-    private void generateTabularCsv(BufferedWriter writer, Sheet sheet) throws IOException {
+    private void generateTabularCsv(CSVPrinter csvPrinter, Sheet sheet) throws IOException {
         List<Column> columns = sheet.getColumns();
         if (columns == null || columns.isEmpty()) {
             return;
         }
         
         if (includeHeaders) {
-            String header = columns.stream()
-                    .map(col -> {
-                        String headerText = col.getLabel() != null ? col.getLabel() : col.getName();
-                        if (col.getRequired() != null && col.getRequired()) {
-                            headerText += " *";
-                        }
-                        return escapeCsv(headerText);
-                    })
-                    .collect(Collectors.joining(separator));
-            writer.write(header);
-            writer.newLine();
+            List<String> headers = new ArrayList<>();
+            for (Column col : columns) {
+                String headerText = col.getLabel() != null ? col.getLabel() : col.getName();
+                if (col.getRequired() != null && col.getRequired()) {
+                    headerText += " *";
+                }
+                headers.add(headerText);
+            }
+            csvPrinter.printRecord(headers);
         }
         
         for (int i = 0; i < 10; i++) {
-            String emptyRow = columns.stream()
-                    .map(col -> "")
-                    .collect(Collectors.joining(separator));
-            writer.write(emptyRow);
-            writer.newLine();
+            List<String> emptyRow = new ArrayList<>();
+            for (int j = 0; j < columns.size(); j++) {
+                emptyRow.add("");
+            }
+            csvPrinter.printRecord(emptyRow);
         }
-    }
-    
-    private String escapeCsv(String value) {
-        if (value == null) {
-            return "";
-        }
-        
-        if (value.contains("\"") || value.contains(separator) || 
-            value.contains("\n") || value.contains("\r")) {
-            return "\"" + value.replace("\"", "\"\"") + "\"";
-        }
-        
-        return value;
     }
     
     private String sanitizeFileName(String fileName) {
         return fileName.replaceAll("[^a-zA-Z0-9_\\-]", "_");
     }
     
-    public String getSeparator() {
-        return separator;
+    public CSVFormat getCsvFormat() {
+        return csvFormat;
     }
     
     public boolean isIncludeHeaders() {

@@ -46,6 +46,13 @@
             <version>${jackson.version}</version>
         </dependency>
 
+        <!-- Apache Commons CSV for CSV generation -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-csv</artifactId>
+            <version>1.10.0</version>
+        </dependency>
+
         <!-- Lombok for reducing boilerplate -->
         <dependency>
             <groupId>org.projectlombok</groupId>

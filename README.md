@@ -21,10 +21,11 @@
 ## Tech Stack / 技术栈
 
 - Java 17+
-- Apache POI 5.2.3 (Excel文件操作)
-- Jackson 2.15.2 (JSON解析)
-- Lombok 1.18.28 (减少样板代码)
-- Maven (项目管理)
+- Apache POI 5.2.3 (Excel文件操作 / Excel operations)
+- Apache Commons CSV 1.10.0 (CSV文件操作 / CSV operations)
+- Jackson 2.15.2 (JSON解析 / JSON parsing)
+- Lombok 1.18.28 (减少样板代码 / Reduce boilerplate)
+- Maven (项目管理 / Project management)
 
 ## 快速开始
 

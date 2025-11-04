@@ -5,6 +5,8 @@ import com.excel.schema.model.DataType;
 import com.excel.schema.model.ExcelSchema;
 import com.excel.schema.model.FormatType;
 import com.excel.schema.model.Sheet;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -14,22 +16,25 @@ import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class CsvDataPopulator {
     
     private final ExcelSchema schema;
-    private final String separator;
+    private final CSVFormat csvFormat;
     private final Map<String, List<List<String>>> sheetData;
     private final DateTimeFormatter dateFormatter;
     
     public CsvDataPopulator(ExcelSchema schema) {
-        this(schema, ",");
+        this(schema, CSVFormat.DEFAULT);
     }
     
     public CsvDataPopulator(ExcelSchema schema, String separator) {
+        this(schema, CSVFormat.DEFAULT.withDelimiter(separator.charAt(0)));
+    }
+    
+    public CsvDataPopulator(ExcelSchema schema, CSVFormat csvFormat) {
         this.schema = schema;
-        this.separator = separator;
+        this.csvFormat = csvFormat;
         this.sheetData = new HashMap<>();
         this.dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     }
@@ -78,15 +83,14 @@ public class CsvDataPopulator {
             return;
         }
         
-        List<String> headers = columns.stream()
-                .map(col -> {
-                    String header = col.getLabel() != null ? col.getLabel() : col.getName();
-                    if (col.getRequired() != null && col.getRequired()) {
-                        header += " *";
-                    }
-                    return header;
-                })
-                .collect(Collectors.toList());
+        List<String> headers = new ArrayList<>();
+        for (Column col : columns) {
+            String header = col.getLabel() != null ? col.getLabel() : col.getName();
+            if (col.getRequired() != null && col.getRequired()) {
+                header += " *";
+            }
+            headers.add(header);
+        }
         rows.add(headers);
         
         if (tabularData != null) {
@@ -132,14 +136,11 @@ public class CsvDataPopulator {
     
     private void writeCsvFile(String filePath, List<List<String>> rows) throws IOException {
         try (BufferedWriter writer = new BufferedWriter(
-                new OutputStreamWriter(new FileOutputStream(filePath), StandardCharsets.UTF_8))) {
+                new OutputStreamWriter(new FileOutputStream(filePath), StandardCharsets.UTF_8));
+             CSVPrinter csvPrinter = new CSVPrinter(writer, csvFormat)) {
             
             for (List<String> row : rows) {
-                String line = row.stream()
-                        .map(this::escapeCsv)
-                        .collect(Collectors.joining(separator));
-                writer.write(line);
-                writer.newLine();
+                csvPrinter.printRecord(row);
             }
         }
     }
@@ -172,19 +173,6 @@ public class CsvDataPopulator {
         }
     }
     
-    private String escapeCsv(String value) {
-        if (value == null) {
-            return "";
-        }
-        
-        if (value.contains("\"") || value.contains(separator) || 
-            value.contains("\n") || value.contains("\r")) {
-            return "\"" + value.replace("\"", "\"\"") + "\"";
-        }
-        
-        return value;
-    }
-    
     private Sheet findSheetDefinition(String sheetName) {
         if (schema.getSchema() == null || schema.getSchema().getSheets() == null) {
             return null;
@@ -198,5 +186,9 @@ public class CsvDataPopulator {
     
     private String sanitizeFileName(String fileName) {
         return fileName.replaceAll("[^a-zA-Z0-9_\\-]", "_");
+    }
+    
+    public CSVFormat getCsvFormat() {
+        return csvFormat;
     }
 }
