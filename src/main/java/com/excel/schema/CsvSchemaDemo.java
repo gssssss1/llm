@@ -1,6 +1,5 @@
 package com.excel.schema;
 
-import com.excel.schema.generator.CsvDataPopulator;
 import com.excel.schema.generator.CsvGenerator;
 import com.excel.schema.model.ExcelSchema;
 import com.excel.schema.parser.SchemaParser;
@@ -127,14 +126,13 @@ public class CsvSchemaDemo {
             ExcelSchema schema = parser.parseFromJson(schemaJson);
             
             CsvGenerator generator = new CsvGenerator(schema);
-            
-            CsvDataPopulator populator = new CsvDataPopulator(schema);
+            generator.generate("csv_output");
             
             Map<String, Object> indexData = new HashMap<>();
             indexData.put("Study Name", "Clinical Trial ABC-123");
             indexData.put("Study Date", "2024-01-15");
             indexData.put("Principal Investigator", "Dr. John Smith");
-            populator.populateSheet("Index", indexData);
+            generator.populateSheet("Index", indexData);
             
             List<Map<String, Object>> eligibilityData = new ArrayList<>();
             Map<String, Object> row1 = new HashMap<>();
@@ -147,7 +145,7 @@ public class CsvSchemaDemo {
             row2.put("Status", "Inactive");
             eligibilityData.add(row2);
             
-            populator.populateSheet("Eligibility Guardrail", eligibilityData);
+            generator.populateSheet("Eligibility Guardrail", eligibilityData);
             
             List<Map<String, Object>> rulesData = new ArrayList<>();
             Map<String, Object> rule1 = new HashMap<>();
@@ -162,7 +160,7 @@ public class CsvSchemaDemo {
             rule2.put("Severity", "Warning");
             rulesData.add(rule2);
             
-            populator.populateSheet("Rules", rulesData);
+            generator.populateSheet("Rules", rulesData);
             
             List<Map<String, Object>> subjectData = new ArrayList<>();
             Map<String, Object> subject1 = new HashMap<>();
@@ -183,12 +181,11 @@ public class CsvSchemaDemo {
             subject3.put("Eligible", false);
             subjectData.add(subject3);
             
-            populator.populateSheet("ELIG_Age_18_75_V1", subjectData);
+            generator.populateSheet("ELIG_Age_18_75_V1", subjectData);
             
-            String outputDir = "csv_output";
-            populator.saveToDirectory(outputDir);
+            generator.saveToDirectory();
             
-            System.out.println("CSV files generated successfully in directory: " + outputDir);
+            System.out.println("CSV files generated successfully in directory: csv_output");
             System.out.println("Report Name: " + schema.getReportName());
             System.out.println("Number of sheets: " + schema.getSchema().getSheets().size());
             System.out.println("\nGenerated files:");

@@ -1,6 +1,5 @@
 package com.excel.schema;
 
-import com.excel.schema.generator.ExcelDataPopulator;
 import com.excel.schema.generator.ExcelGenerator;
 import com.excel.schema.model.ExcelSchema;
 import com.excel.schema.parser.SchemaParser;
@@ -14,8 +13,7 @@ import java.util.Map;
 public class ExcelSchemaBuilder {
     
     private ExcelSchema schema;
-    private Workbook workbook;
-    private ExcelDataPopulator populator;
+    private ExcelGenerator generator;
     
     private ExcelSchemaBuilder(ExcelSchema schema) {
         this.schema = schema;
@@ -44,37 +42,39 @@ public class ExcelSchemaBuilder {
     }
     
     public ExcelSchemaBuilder build() {
-        ExcelGenerator generator = new ExcelGenerator(schema);
-        this.workbook = generator.generate();
-        this.populator = new ExcelDataPopulator(schema, workbook);
+        generator = new ExcelGenerator(schema);
+        generator.generate();
         return this;
     }
     
     public ExcelSchemaBuilder addKeyValueData(String sheetName, Map<String, Object> data) {
-        if (populator == null) {
+        if (generator == null) {
             throw new IllegalStateException("Must call build() before adding data");
         }
-        populator.populateSheet(sheetName, data);
+        generator.populateSheet(sheetName, data);
         return this;
     }
     
     public ExcelSchemaBuilder addTabularData(String sheetName, List<Map<String, Object>> data) {
-        if (populator == null) {
+        if (generator == null) {
             throw new IllegalStateException("Must call build() before adding data");
         }
-        populator.populateSheet(sheetName, data);
+        generator.populateSheet(sheetName, data);
         return this;
     }
     
     public void saveTo(String filePath) throws IOException {
-        if (populator == null) {
+        if (generator == null) {
             throw new IllegalStateException("Must call build() before saving");
         }
-        populator.saveToFile(filePath);
+        generator.saveToFile(filePath);
     }
     
     public Workbook getWorkbook() {
-        return workbook;
+        if (generator == null) {
+            throw new IllegalStateException("Must call build() first");
+        }
+        return generator.getWorkbook();
     }
     
     public ExcelSchema getSchema() {
@@ -82,8 +82,8 @@ public class ExcelSchemaBuilder {
     }
     
     public void close() throws IOException {
-        if (workbook != null) {
-            workbook.close();
+        if (generator != null && generator.getWorkbook() != null) {
+            generator.getWorkbook().close();
         }
     }
 }

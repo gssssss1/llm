@@ -1,6 +1,7 @@
 package com.excel.schema.generator;
 
 import com.excel.schema.model.Column;
+import com.excel.schema.model.DataType;
 import com.excel.schema.model.ExcelSchema;
 import com.excel.schema.model.FormatType;
 import com.excel.schema.model.Sheet;
@@ -12,14 +13,18 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 
 public class CsvGenerator {
     
     private final ExcelSchema schema;
     private final CSVFormat csvFormat;
     private final boolean includeHeaders;
+    private final Map<String, List<List<String>>> sheetData;
+    private final DateTimeFormatter dateFormatter;
+    private String outputDirectory;
     
     public CsvGenerator(ExcelSchema schema) {
         this(schema, CSVFormat.DEFAULT, true);
@@ -33,9 +38,12 @@ public class CsvGenerator {
         this.schema = schema;
         this.csvFormat = csvFormat;
         this.includeHeaders = includeHeaders;
+        this.sheetData = new HashMap<>();
+        this.dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     }
     
-    public void generateToDirectory(String directoryPath) throws IOException {
+    public void generate(String directoryPath) throws IOException {
+        this.outputDirectory = directoryPath;
         Path dir = Paths.get(directoryPath);
         if (!Files.exists(dir)) {
             Files.createDirectories(dir);
@@ -46,42 +54,52 @@ public class CsvGenerator {
         }
         
         for (Sheet sheet : schema.getSchema().getSheets()) {
-            String fileName = sanitizeFileName(sheet.getName()) + ".csv";
-            Path filePath = dir.resolve(fileName);
-            generateSheet(sheet, filePath.toString());
+            generateEmptySheet(sheet);
         }
     }
     
-    public void generateSheet(Sheet sheet, String filePath) throws IOException {
-        try (BufferedWriter writer = new BufferedWriter(
-                new OutputStreamWriter(new FileOutputStream(filePath), StandardCharsets.UTF_8));
-             CSVPrinter csvPrinter = new CSVPrinter(writer, csvFormat)) {
-            
-            if (sheet.getFormatType() == FormatType.KEY_VALUE) {
-                generateKeyValueCsv(csvPrinter, sheet);
-            } else if (sheet.getFormatType() == FormatType.TABULAR) {
-                generateTabularCsv(csvPrinter, sheet);
-            }
+    public void populateSheet(String sheetName, Map<String, Object> keyValueData) {
+        Sheet sheetDef = findSheetDefinition(sheetName);
+        if (sheetDef == null) {
+            throw new IllegalArgumentException("Sheet definition not found: " + sheetName);
         }
-    }
-    
-    private void generateKeyValueCsv(CSVPrinter csvPrinter, Sheet sheet) throws IOException {
-        List<Column> columns = sheet.getColumns();
-        if (columns == null || columns.isEmpty()) {
-            return;
+        
+        if (sheetDef.getFormatType() != FormatType.KEY_VALUE) {
+            throw new IllegalArgumentException("Sheet " + sheetName + " is not a key-value format");
         }
+        
+        List<List<String>> rows = new ArrayList<>();
         
         if (includeHeaders) {
-            csvPrinter.printRecord("Key", "Value");
+            rows.add(Arrays.asList("Key", "Value"));
         }
         
-        for (Column column : columns) {
-            csvPrinter.printRecord(column.getName(), "");
+        List<Column> columns = sheetDef.getColumns();
+        if (columns != null) {
+            for (Column column : columns) {
+                String key = column.getName();
+                Object value = keyValueData.get(key);
+                String valueStr = formatValue(value, column.getDataType());
+                rows.add(Arrays.asList(key, valueStr));
+            }
         }
+        
+        sheetData.put(sheetName, rows);
     }
     
-    private void generateTabularCsv(CSVPrinter csvPrinter, Sheet sheet) throws IOException {
-        List<Column> columns = sheet.getColumns();
+    public void populateSheet(String sheetName, List<Map<String, Object>> tabularData) {
+        Sheet sheetDef = findSheetDefinition(sheetName);
+        if (sheetDef == null) {
+            throw new IllegalArgumentException("Sheet definition not found: " + sheetName);
+        }
+        
+        if (sheetDef.getFormatType() != FormatType.TABULAR) {
+            throw new IllegalArgumentException("Sheet " + sheetName + " is not a tabular format");
+        }
+        
+        List<List<String>> rows = new ArrayList<>();
+        List<Column> columns = sheetDef.getColumns();
+        
         if (columns == null || columns.isEmpty()) {
             return;
         }
@@ -89,22 +107,153 @@ public class CsvGenerator {
         if (includeHeaders) {
             List<String> headers = new ArrayList<>();
             for (Column col : columns) {
-                String headerText = col.getLabel() != null ? col.getLabel() : col.getName();
+                String header = col.getLabel() != null ? col.getLabel() : col.getName();
                 if (col.getRequired() != null && col.getRequired()) {
-                    headerText += " *";
+                    header += " *";
                 }
-                headers.add(headerText);
+                headers.add(header);
             }
-            csvPrinter.printRecord(headers);
+            rows.add(headers);
         }
         
-        for (int i = 0; i < 10; i++) {
-            List<String> emptyRow = new ArrayList<>();
-            for (int j = 0; j < columns.size(); j++) {
-                emptyRow.add("");
+        if (tabularData != null) {
+            for (Map<String, Object> rowData : tabularData) {
+                List<String> row = new ArrayList<>();
+                for (Column column : columns) {
+                    Object value = rowData.get(column.getName());
+                    String valueStr = formatValue(value, column.getDataType());
+                    row.add(valueStr);
+                }
+                rows.add(row);
             }
-            csvPrinter.printRecord(emptyRow);
         }
+        
+        sheetData.put(sheetName, rows);
+    }
+    
+    public void saveToDirectory() throws IOException {
+        if (outputDirectory == null) {
+            throw new IllegalStateException("Must call generate() before saving");
+        }
+        saveToDirectory(outputDirectory);
+    }
+    
+    public void saveToDirectory(String directoryPath) throws IOException {
+        Path dir = Paths.get(directoryPath);
+        if (!Files.exists(dir)) {
+            Files.createDirectories(dir);
+        }
+        
+        for (Map.Entry<String, List<List<String>>> entry : sheetData.entrySet()) {
+            String sheetName = entry.getKey();
+            List<List<String>> rows = entry.getValue();
+            
+            String fileName = sanitizeFileName(sheetName) + ".csv";
+            Path filePath = dir.resolve(fileName);
+            
+            writeCsvFile(filePath.toString(), rows);
+        }
+    }
+    
+    public void saveSingleSheet(String sheetName, String filePath) throws IOException {
+        List<List<String>> rows = sheetData.get(sheetName);
+        if (rows == null) {
+            throw new IllegalArgumentException("No data found for sheet: " + sheetName);
+        }
+        
+        writeCsvFile(filePath, rows);
+    }
+    
+    private void generateEmptySheet(Sheet sheet) throws IOException {
+        List<List<String>> rows = new ArrayList<>();
+        
+        if (sheet.getFormatType() == FormatType.KEY_VALUE) {
+            if (includeHeaders) {
+                rows.add(Arrays.asList("Key", "Value"));
+            }
+            
+            List<Column> columns = sheet.getColumns();
+            if (columns != null) {
+                for (Column column : columns) {
+                    rows.add(Arrays.asList(column.getName(), ""));
+                }
+            }
+        } else if (sheet.getFormatType() == FormatType.TABULAR) {
+            List<Column> columns = sheet.getColumns();
+            if (columns != null && !columns.isEmpty()) {
+                if (includeHeaders) {
+                    List<String> headers = new ArrayList<>();
+                    for (Column col : columns) {
+                        String headerText = col.getLabel() != null ? col.getLabel() : col.getName();
+                        if (col.getRequired() != null && col.getRequired()) {
+                            headerText += " *";
+                        }
+                        headers.add(headerText);
+                    }
+                    rows.add(headers);
+                }
+                
+                for (int i = 0; i < 10; i++) {
+                    List<String> emptyRow = new ArrayList<>();
+                    for (int j = 0; j < columns.size(); j++) {
+                        emptyRow.add("");
+                    }
+                    rows.add(emptyRow);
+                }
+            }
+        }
+        
+        sheetData.put(sheet.getName(), rows);
+    }
+    
+    private void writeCsvFile(String filePath, List<List<String>> rows) throws IOException {
+        try (BufferedWriter writer = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream(filePath), StandardCharsets.UTF_8));
+             CSVPrinter csvPrinter = new CSVPrinter(writer, csvFormat)) {
+            
+            for (List<String> row : rows) {
+                csvPrinter.printRecord(row);
+            }
+        }
+    }
+    
+    private String formatValue(Object value, DataType dataType) {
+        if (value == null) {
+            return "";
+        }
+        
+        if (dataType == null) {
+            return value.toString();
+        }
+        
+        switch (dataType) {
+            case DATE:
+                if (value instanceof LocalDate) {
+                    return ((LocalDate) value).format(dateFormatter);
+                } else if (value instanceof Date) {
+                    return new java.text.SimpleDateFormat("yyyy-MM-dd").format((Date) value);
+                }
+                return value.toString();
+            case BOOLEAN:
+                return String.valueOf(value);
+            case INTEGER:
+            case DOUBLE:
+            case STRING:
+            case ENUM:
+            default:
+                return value.toString();
+        }
+    }
+    
+    private Sheet findSheetDefinition(String sheetName) {
+        if (schema.getSchema() == null || schema.getSchema().getSheets() == null) {
+            return null;
+        }
+        
+        return schema.getSchema().getSheets().stream()
+                .filter(s -> s.getName().equals(sheetName))
+                .findFirst()
+                .orElse(null);
     }
     
     private String sanitizeFileName(String fileName) {

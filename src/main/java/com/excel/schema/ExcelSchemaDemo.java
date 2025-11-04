@@ -1,10 +1,8 @@
 package com.excel.schema;
 
-import com.excel.schema.generator.ExcelDataPopulator;
 import com.excel.schema.generator.ExcelGenerator;
 import com.excel.schema.model.ExcelSchema;
 import com.excel.schema.parser.SchemaParser;
-import org.apache.poi.ss.usermodel.Workbook;
 
 import java.io.IOException;
 import java.util.*;
@@ -128,15 +126,13 @@ public class ExcelSchemaDemo {
             ExcelSchema schema = parser.parseFromJson(schemaJson);
             
             ExcelGenerator generator = new ExcelGenerator(schema);
-            Workbook workbook = generator.generate();
-            
-            ExcelDataPopulator populator = new ExcelDataPopulator(schema, workbook);
+            generator.generate();
             
             Map<String, Object> indexData = new HashMap<>();
             indexData.put("Study Name", "Clinical Trial ABC-123");
             indexData.put("Study Date", "2024-01-15");
             indexData.put("Principal Investigator", "Dr. John Smith");
-            populator.populateSheet("Index", indexData);
+            generator.populateSheet("Index", indexData);
             
             List<Map<String, Object>> eligibilityData = new ArrayList<>();
             Map<String, Object> row1 = new HashMap<>();
@@ -149,7 +145,7 @@ public class ExcelSchemaDemo {
             row2.put("Status", "Inactive");
             eligibilityData.add(row2);
             
-            populator.populateSheet("Eligibility Guardrail", eligibilityData);
+            generator.populateSheet("Eligibility Guardrail", eligibilityData);
             
             List<Map<String, Object>> rulesData = new ArrayList<>();
             Map<String, Object> rule1 = new HashMap<>();
@@ -164,7 +160,7 @@ public class ExcelSchemaDemo {
             rule2.put("Severity", "Warning");
             rulesData.add(rule2);
             
-            populator.populateSheet("Rules", rulesData);
+            generator.populateSheet("Rules", rulesData);
             
             List<Map<String, Object>> subjectData = new ArrayList<>();
             Map<String, Object> subject1 = new HashMap<>();
@@ -185,16 +181,18 @@ public class ExcelSchemaDemo {
             subject3.put("Eligible", false);
             subjectData.add(subject3);
             
-            populator.populateSheet("ELIG_Age_18_75_V1", subjectData);
+            generator.populateSheet("ELIG_Age_18_75_V1", subjectData);
             
-            String outputPath = "output.xlsx";
-            populator.saveToFile(outputPath);
+            generator.saveToFile("output_demo.xlsx");
             
-            System.out.println("Excel file generated successfully: " + outputPath);
+            System.out.println("Excel file generated successfully: output_demo.xlsx");
             System.out.println("Report Name: " + schema.getReportName());
             System.out.println("Number of sheets: " + schema.getSchema().getSheets().size());
-            
-            workbook.close();
+            System.out.println("\nGenerated sheets:");
+            System.out.println("  - Index (key-value format)");
+            System.out.println("  - Eligibility Guardrail (tabular format)");
+            System.out.println("  - Rules (tabular format)");
+            System.out.println("  - ELIG_Age_18_75_V1 (tabular format)");
             
         } catch (IOException e) {
             System.err.println("Error generating Excel file: " + e.getMessage());

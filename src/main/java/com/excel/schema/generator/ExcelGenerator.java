@@ -1,6 +1,7 @@
 package com.excel.schema.generator;
 
 import com.excel.schema.model.Column;
+import com.excel.schema.model.DataType;
 import com.excel.schema.model.ExcelSchema;
 import com.excel.schema.model.FormatType;
 import com.excel.schema.model.Sheet;
@@ -11,55 +12,106 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class ExcelGenerator {
     
     private final ExcelSchema schema;
+    private Workbook workbook;
+    private final Map<String, org.apache.poi.ss.usermodel.Sheet> sheetMap;
     
     public ExcelGenerator(ExcelSchema schema) {
         this.schema = schema;
+        this.sheetMap = new HashMap<>();
     }
     
     public Workbook generate() {
-        Workbook workbook = new XSSFWorkbook();
+        workbook = new XSSFWorkbook();
         
         if (schema.getSchema() == null || schema.getSchema().getSheets() == null) {
             return workbook;
         }
         
         for (Sheet sheetDef : schema.getSchema().getSheets()) {
-            createSheet(workbook, sheetDef);
+            createSheet(sheetDef);
         }
         
         return workbook;
     }
     
-    public void generateToFile(String filePath) throws IOException {
-        try (Workbook workbook = generate();
-             FileOutputStream fileOut = new FileOutputStream(filePath)) {
+    public void populateSheet(String sheetName, Map<String, Object> keyValueData) {
+        Sheet sheetDef = findSheetDefinition(sheetName);
+        if (sheetDef == null) {
+            throw new IllegalArgumentException("Sheet definition not found: " + sheetName);
+        }
+        
+        if (sheetDef.getFormatType() != FormatType.KEY_VALUE) {
+            throw new IllegalArgumentException("Sheet " + sheetName + " is not a key-value format");
+        }
+        
+        org.apache.poi.ss.usermodel.Sheet sheet = sheetMap.get(sheetName);
+        if (sheet == null) {
+            throw new IllegalArgumentException("Sheet not found: " + sheetName);
+        }
+        
+        populateKeyValueData(sheet, sheetDef, keyValueData);
+    }
+    
+    public void populateSheet(String sheetName, List<Map<String, Object>> tabularData) {
+        Sheet sheetDef = findSheetDefinition(sheetName);
+        if (sheetDef == null) {
+            throw new IllegalArgumentException("Sheet definition not found: " + sheetName);
+        }
+        
+        if (sheetDef.getFormatType() != FormatType.TABULAR) {
+            throw new IllegalArgumentException("Sheet " + sheetName + " is not a tabular format");
+        }
+        
+        org.apache.poi.ss.usermodel.Sheet sheet = sheetMap.get(sheetName);
+        if (sheet == null) {
+            throw new IllegalArgumentException("Sheet not found: " + sheetName);
+        }
+        
+        populateTabularData(sheet, sheetDef, tabularData);
+    }
+    
+    public void saveToFile(String filePath) throws IOException {
+        if (workbook == null) {
+            throw new IllegalStateException("Must call generate() before saving");
+        }
+        try (FileOutputStream fileOut = new FileOutputStream(filePath)) {
             workbook.write(fileOut);
         }
     }
     
-    public void generateToOutputStream(OutputStream outputStream) throws IOException {
-        try (Workbook workbook = generate()) {
-            workbook.write(outputStream);
+    public void saveToOutputStream(OutputStream outputStream) throws IOException {
+        if (workbook == null) {
+            throw new IllegalStateException("Must call generate() before saving");
         }
+        workbook.write(outputStream);
     }
     
-    private void createSheet(Workbook workbook, Sheet sheetDef) {
+    public Workbook getWorkbook() {
+        return workbook;
+    }
+    
+    private void createSheet(Sheet sheetDef) {
         org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet(sheetDef.getName());
+        sheetMap.put(sheetDef.getName(), sheet);
         
         if (sheetDef.getFormatType() == FormatType.KEY_VALUE) {
-            createKeyValueSheet(workbook, sheet, sheetDef);
+            createKeyValueSheet(sheet, sheetDef);
         } else if (sheetDef.getFormatType() == FormatType.TABULAR) {
-            createTabularSheet(workbook, sheet, sheetDef);
+            createTabularSheet(sheet, sheetDef);
         }
     }
     
-    private void createKeyValueSheet(Workbook workbook, org.apache.poi.ss.usermodel.Sheet sheet, Sheet sheetDef) {
+    private void createKeyValueSheet(org.apache.poi.ss.usermodel.Sheet sheet, Sheet sheetDef) {
         CellStyle headerStyle = createHeaderStyle(workbook);
         CellStyle valueStyle = createValueStyle(workbook);
         
@@ -79,10 +131,6 @@ public class ExcelGenerator {
             Cell valueCell = row.createCell(1);
             valueCell.setCellStyle(valueStyle);
             
-            if (column.getRequired() != null && column.getRequired()) {
-                valueCell.setCellValue("");
-            }
-            
             if (column.getEnumValues() != null && !column.getEnumValues().isEmpty()) {
                 addDataValidation(sheet, column.getEnumValues(), rowNum - 1, 1);
             }
@@ -94,7 +142,7 @@ public class ExcelGenerator {
         sheet.setColumnWidth(1, 8000);
     }
     
-    private void createTabularSheet(Workbook workbook, org.apache.poi.ss.usermodel.Sheet sheet, Sheet sheetDef) {
+    private void createTabularSheet(org.apache.poi.ss.usermodel.Sheet sheet, Sheet sheetDef) {
         CellStyle headerStyle = createHeaderStyle(workbook);
         CellStyle valueStyle = createValueStyle(workbook);
         
@@ -133,6 +181,128 @@ public class ExcelGenerator {
                 cell.setCellStyle(valueStyle);
             }
         }
+    }
+    
+    private void populateKeyValueData(org.apache.poi.ss.usermodel.Sheet sheet, Sheet sheetDef, Map<String, Object> data) {
+        List<Column> columns = sheetDef.getColumns();
+        if (columns == null || columns.isEmpty()) {
+            return;
+        }
+        
+        for (int i = 0; i < columns.size(); i++) {
+            Column column = columns.get(i);
+            Row row = sheet.getRow(i);
+            if (row == null) {
+                continue;
+            }
+            
+            Cell valueCell = row.getCell(1);
+            if (valueCell == null) {
+                valueCell = row.createCell(1);
+            }
+            
+            Object value = data.get(column.getName());
+            if (value != null) {
+                setCellValue(valueCell, value, column.getDataType());
+            }
+        }
+    }
+    
+    private void populateTabularData(org.apache.poi.ss.usermodel.Sheet sheet, Sheet sheetDef, List<Map<String, Object>> data) {
+        List<Column> columns = sheetDef.getColumns();
+        if (columns == null || columns.isEmpty() || data == null || data.isEmpty()) {
+            return;
+        }
+        
+        for (int rowIndex = 0; rowIndex < data.size(); rowIndex++) {
+            Map<String, Object> rowData = data.get(rowIndex);
+            Row row = sheet.getRow(rowIndex + 1);
+            
+            if (row == null) {
+                row = sheet.createRow(rowIndex + 1);
+            }
+            
+            for (int colIndex = 0; colIndex < columns.size(); colIndex++) {
+                Column column = columns.get(colIndex);
+                Cell cell = row.getCell(colIndex);
+                
+                if (cell == null) {
+                    cell = row.createCell(colIndex);
+                }
+                
+                Object value = rowData.get(column.getName());
+                if (value != null) {
+                    setCellValue(cell, value, column.getDataType());
+                }
+            }
+        }
+    }
+    
+    private void setCellValue(Cell cell, Object value, DataType dataType) {
+        if (value == null) {
+            cell.setBlank();
+            return;
+        }
+        
+        if (dataType == null) {
+            cell.setCellValue(value.toString());
+            return;
+        }
+        
+        switch (dataType) {
+            case STRING:
+            case ENUM:
+                cell.setCellValue(value.toString());
+                break;
+            case INTEGER:
+                if (value instanceof Number) {
+                    cell.setCellValue(((Number) value).intValue());
+                } else {
+                    cell.setCellValue(Integer.parseInt(value.toString()));
+                }
+                break;
+            case DOUBLE:
+                if (value instanceof Number) {
+                    cell.setCellValue(((Number) value).doubleValue());
+                } else {
+                    cell.setCellValue(Double.parseDouble(value.toString()));
+                }
+                break;
+            case BOOLEAN:
+                if (value instanceof Boolean) {
+                    cell.setCellValue((Boolean) value);
+                } else {
+                    cell.setCellValue(Boolean.parseBoolean(value.toString()));
+                }
+                break;
+            case DATE:
+                if (value instanceof Date) {
+                    cell.setCellValue((Date) value);
+                } else if (value instanceof LocalDate) {
+                    Date date = Date.from(((LocalDate) value).atStartOfDay(ZoneId.systemDefault()).toInstant());
+                    cell.setCellValue(date);
+                } else {
+                    cell.setCellValue(value.toString());
+                }
+                CellStyle cellStyle = workbook.createCellStyle();
+                CreationHelper createHelper = workbook.getCreationHelper();
+                cellStyle.setDataFormat(createHelper.createDataFormat().getFormat("yyyy-MM-dd"));
+                cell.setCellStyle(cellStyle);
+                break;
+            default:
+                cell.setCellValue(value.toString());
+        }
+    }
+    
+    private Sheet findSheetDefinition(String sheetName) {
+        if (schema.getSchema() == null || schema.getSchema().getSheets() == null) {
+            return null;
+        }
+        
+        return schema.getSchema().getSheets().stream()
+                .filter(s -> s.getName().equals(sheetName))
+                .findFirst()
+                .orElse(null);
     }
     
     private CellStyle createHeaderStyle(Workbook workbook) {

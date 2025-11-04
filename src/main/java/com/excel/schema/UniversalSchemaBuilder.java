@@ -3,7 +3,6 @@ package com.excel.schema;
 import com.excel.schema.generator.*;
 import com.excel.schema.model.ExcelSchema;
 import com.excel.schema.parser.SchemaParser;
-import org.apache.poi.ss.usermodel.Workbook;
 
 import java.io.File;
 import java.io.IOException;
@@ -13,8 +12,7 @@ import java.util.Map;
 public class UniversalSchemaBuilder {
     
     private ExcelSchema schema;
-    private Object generatorResult;
-    private Object dataPopulator;
+    private Object generator;
     private ReportGeneratorFactory.FileType fileType;
     
     private UniversalSchemaBuilder(ExcelSchema schema) {
@@ -44,17 +42,16 @@ public class UniversalSchemaBuilder {
         return new UniversalSchemaBuilder(schema);
     }
     
-    public UniversalSchemaBuilder build() {
+    public UniversalSchemaBuilder build() throws IOException {
         switch (fileType) {
             case EXCEL:
                 ExcelGenerator excelGen = new ExcelGenerator(schema);
-                Workbook workbook = excelGen.generate();
-                this.generatorResult = workbook;
-                this.dataPopulator = new ExcelDataPopulator(schema, workbook);
+                excelGen.generate();
+                this.generator = excelGen;
                 break;
             case CSV:
-                this.generatorResult = new CsvGenerator(schema);
-                this.dataPopulator = new CsvDataPopulator(schema);
+                CsvGenerator csvGen = new CsvGenerator(schema);
+                this.generator = csvGen;
                 break;
             default:
                 throw new IllegalStateException("Unsupported file type: " + fileType);
@@ -63,40 +60,40 @@ public class UniversalSchemaBuilder {
     }
     
     public UniversalSchemaBuilder addKeyValueData(String sheetName, Map<String, Object> data) {
-        if (dataPopulator == null) {
+        if (generator == null) {
             throw new IllegalStateException("Must call build() before adding data");
         }
         
-        if (dataPopulator instanceof ExcelDataPopulator) {
-            ((ExcelDataPopulator) dataPopulator).populateSheet(sheetName, data);
-        } else if (dataPopulator instanceof CsvDataPopulator) {
-            ((CsvDataPopulator) dataPopulator).populateSheet(sheetName, data);
+        if (generator instanceof ExcelGenerator) {
+            ((ExcelGenerator) generator).populateSheet(sheetName, data);
+        } else if (generator instanceof CsvGenerator) {
+            ((CsvGenerator) generator).populateSheet(sheetName, data);
         }
         return this;
     }
     
     public UniversalSchemaBuilder addTabularData(String sheetName, List<Map<String, Object>> data) {
-        if (dataPopulator == null) {
+        if (generator == null) {
             throw new IllegalStateException("Must call build() before adding data");
         }
         
-        if (dataPopulator instanceof ExcelDataPopulator) {
-            ((ExcelDataPopulator) dataPopulator).populateSheet(sheetName, data);
-        } else if (dataPopulator instanceof CsvDataPopulator) {
-            ((CsvDataPopulator) dataPopulator).populateSheet(sheetName, data);
+        if (generator instanceof ExcelGenerator) {
+            ((ExcelGenerator) generator).populateSheet(sheetName, data);
+        } else if (generator instanceof CsvGenerator) {
+            ((CsvGenerator) generator).populateSheet(sheetName, data);
         }
         return this;
     }
     
     public void saveTo(String path) throws IOException {
-        if (dataPopulator == null) {
+        if (generator == null) {
             throw new IllegalStateException("Must call build() before saving");
         }
         
-        if (dataPopulator instanceof ExcelDataPopulator) {
-            ((ExcelDataPopulator) dataPopulator).saveToFile(path);
-        } else if (dataPopulator instanceof CsvDataPopulator) {
-            ((CsvDataPopulator) dataPopulator).saveToDirectory(path);
+        if (generator instanceof ExcelGenerator) {
+            ((ExcelGenerator) generator).saveToFile(path);
+        } else if (generator instanceof CsvGenerator) {
+            ((CsvGenerator) generator).saveToDirectory(path);
         }
     }
     
@@ -105,11 +102,11 @@ public class UniversalSchemaBuilder {
             throw new IllegalStateException("saveToDirectory() is only supported for CSV format");
         }
         
-        if (dataPopulator == null) {
+        if (generator == null) {
             throw new IllegalStateException("Must call build() before saving");
         }
         
-        ((CsvDataPopulator) dataPopulator).saveToDirectory(directoryPath);
+        ((CsvGenerator) generator).saveToDirectory(directoryPath);
     }
     
     public void saveToFile(String filePath) throws IOException {
@@ -117,15 +114,15 @@ public class UniversalSchemaBuilder {
             throw new IllegalStateException("saveToFile() is only supported for Excel format");
         }
         
-        if (dataPopulator == null) {
+        if (generator == null) {
             throw new IllegalStateException("Must call build() before saving");
         }
         
-        ((ExcelDataPopulator) dataPopulator).saveToFile(filePath);
+        ((ExcelGenerator) generator).saveToFile(filePath);
     }
     
-    public Object getGeneratorResult() {
-        return generatorResult;
+    public Object getGenerator() {
+        return generator;
     }
     
     public ExcelSchema getSchema() {
@@ -137,8 +134,11 @@ public class UniversalSchemaBuilder {
     }
     
     public void close() throws IOException {
-        if (generatorResult instanceof Workbook) {
-            ((Workbook) generatorResult).close();
+        if (generator instanceof ExcelGenerator) {
+            ExcelGenerator excelGen = (ExcelGenerator) generator;
+            if (excelGen.getWorkbook() != null) {
+                excelGen.getWorkbook().close();
+            }
         }
     }
 }

@@ -37,29 +37,11 @@ public class ReportGeneratorFactory {
         
         switch (fileType) {
             case EXCEL:
-                return new ExcelGenerator(schema);
+                ExcelGenerator excelGen = new ExcelGenerator(schema);
+                excelGen.generate();
+                return excelGen;
             case CSV:
                 return new CsvGenerator(schema);
-            default:
-                throw new IllegalArgumentException("Unsupported file type: " + schema.getReportFileType());
-        }
-    }
-    
-    public static Object createDataPopulator(ExcelSchema schema, Object generator) {
-        if (schema.getReportFileType() == null) {
-            throw new IllegalArgumentException("Report file type is not specified");
-        }
-        
-        FileType fileType = FileType.fromString(schema.getReportFileType());
-        
-        switch (fileType) {
-            case EXCEL:
-                if (generator instanceof org.apache.poi.ss.usermodel.Workbook) {
-                    return new ExcelDataPopulator(schema, (org.apache.poi.ss.usermodel.Workbook) generator);
-                }
-                throw new IllegalArgumentException("Invalid generator type for Excel");
-            case CSV:
-                return new CsvDataPopulator(schema);
             default:
                 throw new IllegalArgumentException("Unsupported file type: " + schema.getReportFileType());
         }
