@@ -73,5 +73,10 @@ ehthumbs.db
 *.xlsx
 *.xls
 
+# Generated CSV files
+*.csv
+csv_output/
+csv_output_universal/
+
 # Test output
 test-output/

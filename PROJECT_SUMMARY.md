@@ -1,50 +1,61 @@
-# Excel Schema Generator - Project Summary
+# Excel & CSV Schema Generator - Project Summary
 
 ## What Has Been Created
 
-A complete Java library for generating Excel files based on JSON schema definitions. This was built based on your specific schema requirements with support for:
+A complete Java library for generating **both Excel and CSV** files based on JSON schema definitions. This was built based on your specific schema requirements with support for:
 
 1. **Key-Value format** - For metadata and configuration (like your "Index" sheet)
 2. **Tabular format** - For table data (like your "Eligibility Guardrail", "Rules", and "ELIG_Age_18_75_V1" sheets)
+3. **Multiple file formats** - Excel (.xlsx) and CSV with the same schema and code
 
 ## Project Structure
 
 ```
 excel-schema-generator/
-├── pom.xml                           # Maven build configuration
-├── .gitignore                        # Git ignore file
-├── README.md                         # Main documentation (bilingual)
-├── QUICKSTART.md                     # Quick start guide
-├── EXAMPLE.md                        # Complete usage examples
-├── USAGE_ZH.md                       # Chinese documentation
-├── PROJECT_SUMMARY.md                # This file
+├── pom.xml                              # Maven build configuration
+├── .gitignore                           # Git ignore file
+├── README.md                            # Main documentation (bilingual)
+├── QUICKSTART.md                        # Quick start guide for Excel
+├── CSV_QUICKSTART.md                    # Quick start guide for CSV
+├── CSV_GUIDE.md                         # Complete CSV guide
+├── EXAMPLE.md                           # Complete usage examples
+├── USAGE_ZH.md                          # Chinese documentation
+├── PROJECT_SUMMARY.md                   # This file
 │
 ├── src/main/java/com/excel/schema/
-│   ├── model/                        # Data model classes
-│   │   ├── ExcelSchema.java         # Root schema object
-│   │   ├── Sheet.java               # Sheet definition
-│   │   ├── Column.java              # Column definition
-│   │   ├── FormatType.java          # Format type enum (key_value, tabular)
-│   │   └── DataType.java            # Data type enum (string, integer, etc.)
+│   ├── model/                           # Data model classes
+│   │   ├── ExcelSchema.java            # Root schema object
+│   │   ├── Sheet.java                  # Sheet definition
+│   │   ├── Column.java                 # Column definition
+│   │   ├── FormatType.java             # Format type enum (key_value, tabular)
+│   │   └── DataType.java               # Data type enum (string, integer, etc.)
 │   │
 │   ├── parser/
-│   │   └── SchemaParser.java        # JSON schema parser
+│   │   └── SchemaParser.java           # JSON schema parser
 │   │
 │   ├── generator/
-│   │   ├── ExcelGenerator.java      # Excel structure generator
-│   │   └── ExcelDataPopulator.java  # Excel data populator
+│   │   ├── ExcelGenerator.java         # Excel structure generator
+│   │   ├── ExcelDataPopulator.java     # Excel data populator
+│   │   ├── CsvGenerator.java           # CSV structure generator
+│   │   ├── CsvDataPopulator.java       # CSV data populator
+│   │   └── ReportGeneratorFactory.java # Factory for format selection
 │   │
-│   ├── ExcelSchemaBuilder.java      # Fluent API builder
-│   └── ExcelSchemaDemo.java         # Working demo example
+│   ├── ExcelSchemaBuilder.java         # Fluent API builder for Excel
+│   ├── UniversalSchemaBuilder.java     # Universal builder (Excel + CSV)
+│   ├── ExcelSchemaDemo.java            # Excel demo
+│   ├── CsvSchemaDemo.java              # CSV demo
+│   └── UniversalSchemaDemo.java        # Universal demo
 │
 ├── src/main/resources/
-│   └── example-schema.json          # Example schema file
+│   ├── example-schema.json             # Example schema file
+│   └── your-schema.json                # Your original schema
 │
 └── src/test/java/com/excel/schema/
     ├── generator/
-    │   └── ExcelGeneratorTest.java  # Generator unit tests
+    │   ├── ExcelGeneratorTest.java     # Excel generator tests
+    │   └── CsvGeneratorTest.java       # CSV generator tests
     └── parser/
-        └── SchemaParserTest.java    # Parser unit tests
+        └── SchemaParserTest.java       # Parser unit tests
 ```
 
 ## Key Features Implemented

@@ -1,20 +1,22 @@
-# Excel Schema Generator
+# Excel & CSV Schema Generator
 
-> A powerful Java library for generating Excel files from JSON schema definitions. Supports both Key-Value and Tabular format types.
+> A powerful Java library for generating Excel and CSV files from JSON schema definitions. Supports both Key-Value and Tabular format types.
 
-一个基于JSON Schema定义生成Excel文件的Java库。支持两种格式类型：Key-Value（键值对）和 Tabular（表格）。
+一个基于JSON Schema定义生成Excel和CSV文件的Java库。支持两种格式类型：Key-Value（键值对）和 Tabular（表格）。
 
-[中文使用指南 / Chinese Documentation](USAGE_ZH.md)
+[中文使用指南 / Chinese Documentation](USAGE_ZH.md) | [CSV Guide / CSV指南](CSV_GUIDE.md)
 
 ## Features / 功能特性
 
-- 📊 **Flexible Schema Definition**: Define Excel structure using JSON / **灵活的Schema定义**: 使用JSON定义Excel文件结构
-- 🔑 **Key-Value Format**: Support for configuration and metadata sheets / **Key-Value格式**: 支持键值对格式的sheet
-- 📋 **Tabular Format**: Support for traditional table data / **Tabular格式**: 支持传统表格格式的sheet
-- ✅ **Data Validation**: Dropdown lists for enum types / **数据验证**: 支持枚举类型的下拉列表
-- 💬 **Cell Comments**: Auto-generated descriptions / **注释说明**: 自动为列添加描述性注释
-- 🎨 **Custom Styling**: Professional header and data cell styles / **样式设置**: 自动应用表头和数据单元格样式
+- 📊 **Flexible Schema Definition**: Define structure using JSON / **灵活的Schema定义**: 使用JSON定义文件结构
+- 📁 **Multiple Formats**: Excel (.xlsx) and CSV support / **多种格式**: 支持Excel (.xlsx) 和 CSV
+- 🔑 **Key-Value Format**: Support for configuration and metadata / **Key-Value格式**: 支持键值对格式
+- 📋 **Tabular Format**: Support for traditional table data / **Tabular格式**: 支持传统表格格式
+- ✅ **Data Validation**: Dropdown lists for enum types (Excel) / **数据验证**: 支持枚举类型的下拉列表（Excel）
+- 💬 **Cell Comments**: Auto-generated descriptions (Excel) / **注释说明**: 自动为列添加描述性注释（Excel）
+- 🎨 **Custom Styling**: Professional header and data cell styles (Excel) / **样式设置**: 自动应用表头和数据单元格样式（Excel）
 - 🔒 **Required Fields**: Mark required fields with asterisks / **必填字段**: 标记必填字段（在表头添加 * 标记）
+- 🚀 **Universal API**: Same code for both Excel and CSV / **通用API**: Excel和CSV使用相同代码
 
 ## Tech Stack / 技术栈
 
@@ -41,7 +43,7 @@
 ```json
 {
     "report_name": "Clinical Study Report",
-    "report_file_type": "excel",
+    "report_file_type": "excel",  // or "csv" for CSV format
     "description": "临床研究报告",
     "schema": {
         "sheet": [
